@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradeCore — NQ Futures Dashboard</title>
+    <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 16px;
+            background: #16213e;
+            border-bottom: 1px solid #0f3460;
+            min-height: 44px;
+        }
+
+        #header h1 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #e94560;
+        }
+
+        #status-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+        }
+
+        #connection-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef5350;
+        }
+
+        #connection-dot.connected {
+            background: #26a69a;
+        }
+
+        #connection-dot.reconnecting {
+            background: #ffa726;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        #mode-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: #0f3460;
+            color: #a0a0a0;
+        }
+
+        #mode-badge.simulation {
+            background: #1a237e;
+            color: #7c4dff;
+        }
+
+        #mode-badge.live {
+            background: #1b5e20;
+            color: #69f0ae;
+        }
+
+        #last-timestamp {
+            color: #888;
+            font-size: 11px;
+        }
+
+        #chart-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #loading-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(26, 26, 46, 0.95);
+            z-index: 10;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        #loading-overlay.hidden {
+            display: none;
+        }
+
+        #loading-overlay .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #0f3460;
+            border-top-color: #e94560;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #loading-overlay p {
+            color: #aaa;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>TradeCore — NQ Futures</h1>
+        <div id="status-bar">
+            <span id="mode-badge">—</span>
+            <div id="connection-indicator">
+                <span id="connection-dot"></span>
+                <span id="connection-text">Desconectado</span>
+            </div>
+            <span id="last-timestamp"></span>
+        </div>
+    </div>
+    <div id="chart-container">
+        <div id="loading-overlay">
+            <div class="spinner"></div>
+            <p>Cargando datos históricos...</p>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        'use strict';
+
+        // --- State ---
+        var markers = [];
+        var chart = null;
+        var candlestickSeries = null;
+        var smaFastSeries = null;
+        var smaSlowSeries = null;
+        var ws = null;
+        var reconnectAttempts = 0;
+        var maxReconnectAttempts = 5;
+        var dataLoaded = false;
+
+        // --- DOM refs ---
+        var loadingOverlay = document.getElementById('loading-overlay');
+        var connectionDot = document.getElementById('connection-dot');
+        var connectionText = document.getElementById('connection-text');
+        var modeBadge = document.getElementById('mode-badge');
+        var lastTimestampEl = document.getElementById('last-timestamp');
+        var chartContainer = document.getElementById('chart-container');
+
+        // --- Chart Initialization ---
+        function initChart() {
+            chart = LightweightCharts.createChart(chartContainer, {
+                width: chartContainer.clientWidth,
+                height: chartContainer.clientHeight,
+                layout: {
+                    background: { type: 'solid', color: '#1a1a2e' },
+                    textColor: '#d1d4dc',
+                },
+                grid: {
+                    vertLines: { color: '#1e2a3a' },
+                    horzLines: { color: '#1e2a3a' },
+                },
+                crosshair: {
+                    mode: LightweightCharts.CrosshairMode.Normal,
+                },
+                rightPriceScale: {
+                    borderColor: '#2a2e39',
+                },
+                timeScale: {
+                    borderColor: '#2a2e39',
+                    timeVisible: true,
+                    secondsVisible: false,
+                },
+            });
+
+            candlestickSeries = chart.addCandlestickSeries({
+                upColor: '#26a69a',
+                downColor: '#ef5350',
+                borderDownColor: '#ef5350',
+                borderUpColor: '#26a69a',
+                wickDownColor: '#ef5350',
+                wickUpColor: '#26a69a',
+            });
+
+            smaFastSeries = chart.addLineSeries({
+                color: '#2196F3',
+                lineWidth: 2,
+                title: 'SMA 9',
+            });
+
+            smaSlowSeries = chart.addLineSeries({
+                color: '#FF9800',
+                lineWidth: 2,
+                title: 'SMA 21',
+            });
+
+            // Responsive resize
+            window.addEventListener('resize', function () {
+                if (chart) {
+                    chart.applyOptions({
+                        width: chartContainer.clientWidth,
+                        height: chartContainer.clientHeight,
+                    });
+                }
+            });
+        }
+
+        // --- WebSocket ---
+        function connectWebSocket() {
+            var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            var wsUrl = protocol + '//' + window.location.host + '/ws/chart';
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = function () {
+                reconnectAttempts = 0;
+                setConnectionStatus('connected');
+            };
+
+            ws.onmessage = function (event) {
+                var parsed;
+                try {
+                    parsed = JSON.parse(event.data);
+                } catch (e) {
+                    console.error('Failed to parse WebSocket message:', e);
+                    return;
+                }
+
+                // Determine if it's a single object (initial_load) or array (batched updates)
+                if (Array.isArray(parsed)) {
+                    handleBatch(parsed);
+                } else if (parsed && parsed.type) {
+                    handleMessage(parsed);
+                }
+            };
+
+            ws.onclose = function () {
+                setConnectionStatus('disconnected');
+                attemptReconnect();
+            };
+
+            ws.onerror = function () {
+                setConnectionStatus('disconnected');
+            };
+        }
+
+        function attemptReconnect() {
+            if (reconnectAttempts >= maxReconnectAttempts) {
+                connectionText.textContent = 'Conexión perdida';
+                return;
+            }
+            reconnectAttempts++;
+            setConnectionStatus('reconnecting');
+            var delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 10000);
+            setTimeout(connectWebSocket, delay);
+        }
+
+        // --- Message Handlers ---
+        function handleBatch(messages) {
+            for (var i = 0; i < messages.length; i++) {
+                handleMessage(messages[i]);
+            }
+        }
+
+        function handleMessage(msg) {
+            switch (msg.type) {
+                case 'initial_load':
+                    handleInitialLoad(msg.data);
+                    break;
+                case 'candle':
+                    handleCandle(msg.data);
+                    break;
+                case 'signal':
+                    handleSignal(msg.data);
+                    break;
+                case 'sma':
+                    handleSma(msg.data);
+                    break;
+                case 'status':
+                    handleStatus(msg.data);
+                    break;
+                default:
+                    console.warn('Unknown message type:', msg.type);
+            }
+        }
+
+        function handleInitialLoad(data) {
+            if (!data) return;
+
+            // Set candles
+            if (data.candles && data.candles.length > 0) {
+                candlestickSeries.setData(data.candles);
+            }
+
+            // Set SMA fast series
+            if (data.sma_fast_series && data.sma_fast_series.length > 0) {
+                smaFastSeries.setData(data.sma_fast_series);
+            }
+
+            // Set SMA slow series
+            if (data.sma_slow_series && data.sma_slow_series.length > 0) {
+                smaSlowSeries.setData(data.sma_slow_series);
+            }
+
+            // Fit content to view
+            chart.timeScale().fitContent();
+
+            // Hide loading overlay
+            dataLoaded = true;
+            loadingOverlay.classList.add('hidden');
+        }
+
+        function handleCandle(data) {
+            if (!data) return;
+            candlestickSeries.update(data);
+        }
+
+        function handleSignal(data) {
+            if (!data) return;
+
+            var marker;
+            if (data.signal_type === 'BUY') {
+                marker = {
+                    time: data.time,
+                    position: 'belowBar',
+                    color: '#26a69a',
+                    shape: 'arrowUp',
+                    text: 'BUY',
+                };
+            } else if (data.signal_type === 'SELL') {
+                marker = {
+                    time: data.time,
+                    position: 'aboveBar',
+                    color: '#ef5350',
+                    shape: 'arrowDown',
+                    text: 'SELL',
+                };
+            } else {
+                return;
+            }
+
+            // Insert marker keeping sorted by time ascending
+            markers.push(marker);
+            markers.sort(function (a, b) { return a.time - b.time; });
+            candlestickSeries.setMarkers(markers);
+        }
+
+        function handleSma(data) {
+            if (!data) return;
+            if (data.sma_fast !== undefined) {
+                smaFastSeries.update({ time: data.time, value: data.sma_fast });
+            }
+            if (data.sma_slow !== undefined) {
+                smaSlowSeries.update({ time: data.time, value: data.sma_slow });
+            }
+        }
+
+        function handleStatus(data) {
+            if (!data) return;
+
+            // Update connection state
+            if (data.connected) {
+                setConnectionStatus('connected');
+            } else {
+                setConnectionStatus('disconnected');
+            }
+
+            // Update mode badge
+            if (data.mode) {
+                var modeText = data.mode === 'simulation' ? 'Simulación' : 'Live';
+                modeBadge.textContent = modeText;
+                modeBadge.className = '';
+                modeBadge.classList.add(data.mode === 'simulation' ? 'simulation' : 'live');
+            }
+
+            // Update last timestamp — guard against null (buffer empty) and
+            // unparseable strings (would produce "Invalid Date" in the UI)
+            if (data.last_candle_time) {
+                var dt = new Date(data.last_candle_time);
+                if (!isNaN(dt.getTime())) {
+                    lastTimestampEl.textContent = 'Último: ' + dt.toLocaleTimeString();
+                } else {
+                    // Unparseable value — show safe fallback
+                    lastTimestampEl.textContent = 'Último: —';
+                }
+            } else {
+                // null or missing — no candle data received yet
+                lastTimestampEl.textContent = 'Último: —';
+            }
+        }
+
+        // --- UI Helpers ---
+        function setConnectionStatus(status) {
+            connectionDot.className = '';
+            switch (status) {
+                case 'connected':
+                    connectionDot.classList.add('connected');
+                    connectionText.textContent = 'Conectado';
+                    break;
+                case 'disconnected':
+                    connectionText.textContent = 'Desconectado';
+                    break;
+                case 'reconnecting':
+                    connectionDot.classList.add('reconnecting');
+                    connectionText.textContent = 'Reconectando...';
+                    break;
+            }
+        }
+
+        // --- Bootstrap ---
+        initChart();
+        connectWebSocket();
+    })();
+    </script>
+</body>
+</html>

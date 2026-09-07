@@ -1,0 +1,274 @@
+{
+  "pbtResults": {
+    "1. Write bug condition exploration test": {
+      "status": "passed",
+      "failingExample": "Exploration test FAILED as expected (5 failed, 2 passed), confirming both bugs exist on unfixed code.\n\nIssue 1 — Debug endpoint:\n- test_debug_network_get_returns_404 FAILED: GET /debug/network returned HTTP 200 (expected 404). Endpoint still exposed. assert 200 == 404.\n- test_debug_network_post_blocked PASSED: POST already returns 405 today (route registered only for GET); acceptable per 404/405 assertion.\n\nIssue 2 — Invalid Date (handleStatus simulated logic):\n- test_issue2_case_b_null_shows_fallback FAILED: handleStatus(None) -> '' (no fallback), expected 'Ultimo: —'.\n- test_issue2_case_c_invalid_string_shows_fallback FAILED: handleStatus('invalid') -> 'Ultimo: Invalid Date', expected 'Ultimo: —'.\n- test_issue2_case_c_empty_string_shows_fallback FAILED: handleStatus('') -> '' (no fallback), expected 'Ultimo: —'.\n- test_issue2_property_invalid_inputs_show_fallback FAILED (Hypothesis counterexample: value=None) -> '' expected 'Ultimo: —'.\n- test_issue2_case_a_valid_iso_shows_time PASSED: valid ISO 8601 still shows formatted time (preservation baseline).",
+      "lastRunTimestamp": 1788138925374
+    },
+    "4.3 Verify with logical test — all 3 cases covered": {
+      "status": "passed",
+      "lastRunTimestamp": 1788140765947
+    }
+  },
+  "executionHistory": {
+    "1. Write bug condition exploration test": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138275686
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138284909
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138945689
+      }
+    ],
+    "2. Write preservation property tests (BEFORE implementing fix)": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138276258
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138949828
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788139714771
+      }
+    ],
+    "3.1 Confirm root cause in `src/api/app.py`": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138276412
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788139719030
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788139765827
+      }
+    ],
+    "3.2 Implement the fix — delete debug endpoint": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138276524
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788139770051
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788140197358
+      }
+    ],
+    "3.3 Verify with `curl` — debug endpoint returns 404 for ANY method": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138276616
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788140201662
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788140363043
+      }
+    ],
+    "4.1 Confirm root cause in `dashboard/index.html`": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138276702
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788140368811
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788140380547
+      }
+    ],
+    "4.2 Implement the fix — add null/validity guard": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138276791
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788140385458
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788140582315
+      }
+    ],
+    "4.3 Verify with logical test — all 3 cases covered": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138276869
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788140592355
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788140790977
+      }
+    ],
+    "4.4 Visual browser verification (complementary)": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138276941
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788140796053
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788141265789
+      }
+    ],
+    "5.1 Verify bug condition exploration test now passes": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138277005
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788141270560
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788141333592
+      }
+    ],
+    "5.2 Verify preservation tests still pass": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138277060
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788141338394
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788141643616
+      }
+    ],
+    "6. Scope confirmation": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138277125
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788141647990
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788141740706
+      }
+    ],
+    "7. Run full pytest suite — regression check": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138277195
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788141745354
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788143289218
+      }
+    ],
+    "8. Final verification report": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788138277273
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788143293508
+      },
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788143298564
+      }
+    ],
+    "3. Fix Issue 1 — Remove `/debug/network` endpoint": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788140363124
+      }
+    ],
+    "4. Fix Issue 2 — Guard `handleStatus` against null/invalid dates": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788141265859
+      }
+    ],
+    "5. Re-run exploration and preservation tests after both fixes": [
+      {
+        "executionId": "c1541acd-4ea6-43a4-811e-cd1e3fa78d07",
+        "chatSessionId": "sess_be39f0ba-8a0c-4a43-8996-434e94ad3a3b",
+        "timestamp": 1788141643702
+      }
+    ]
+  }
+}

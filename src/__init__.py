@@ -1,0 +1,1 @@
+# TradeCore MVP - Main package

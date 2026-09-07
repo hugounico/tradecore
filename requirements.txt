@@ -1,0 +1,15 @@
+# TradeCore MVP - Dependencies
+# Core
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic-settings>=2.1.0
+python-dotenv>=1.0.0
+
+# Data provider
+databento>=0.39.0
+
+# Testing
+hypothesis>=6.92.0
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+httpx>=0.25.0

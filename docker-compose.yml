@@ -1,0 +1,12 @@
+# TradeCore MVP — Docker Compose
+# Requirements: RNF-02
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABENTO_API_KEY=${DATABENTO_API_KEY}
+      - MODE=${MODE:-simulation}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
