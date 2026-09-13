@@ -22,6 +22,8 @@ from __future__ import annotations
 from statistics import median
 from typing import Sequence
 
+import numpy as np  # numpy ya es dependencia del proyecto (vectorizacion de cliff_delta)
+
 from src.calibration.grid import (
     CLIFF_DELTA_GATE,
     N_RESCUED_OBSERVABLE_MIN,
@@ -92,22 +94,36 @@ def cliff_delta(
     `group_a_values` = grupo Aceptado; `group_b_values` = grupo Rechazado. Guarda grupos
     vacios: devuelve None (no se puede calcular el efecto) en vez de dividir por 0.
 
-    Implementacion O(n*m) directa (los tamanos de la Calibracion son manejables y esto
-    es exacto y facil de auditar).
+    Implementacion vectorizada con NumPy (O((n_a + n_b) * log n_b) en vez de O(n_a * n_b)
+    del doble bucle). El resultado es EXACTAMENTE el mismo estadistico: solo cambia COMO
+    se cuentan los pares, no que se cuenta ni el signo, ni el trato de empates.
     """
     n_a = len(group_a_values)
     n_b = len(group_b_values)
+    # La guarda de grupo vacio va ANTES de cualquier trabajo con numpy (contrato: None).
     if n_a == 0 or n_b == 0:
         return None
-    greater = 0  # #{a > b}
-    less = 0  # #{a < b}
-    for a in group_a_values:
-        for b in group_b_values:
-            if a > b:
-                greater += 1
-            elif a < b:
-                less += 1
-            # a == b no suma a ninguno (empates neutrales).
+
+    # Se convierten ambos grupos a arreglos de float (definicion sobre numeros reales).
+    a_arr = np.asarray(group_a_values, dtype=float)
+    b_sorted = np.sort(np.asarray(group_b_values, dtype=float))  # b ordenado una sola vez
+
+    # Idea: en un arreglo ORDENADO, np.searchsorted localiza en O(log n_b) cuantos
+    # elementos quedan a un lado de cada `a`, evaluando TODOS los `a` de una vez.
+    #   - side="left" -> indice del primer b >= a  == cantidad de b ESTRICTAMENTE < a.
+    #   - side="right"-> indice del primer b >  a  == cantidad de b <= a.
+    # Por lo tanto, para cada `a`:
+    #   #{b < a} = searchsorted(b_sorted, a, "left")
+    #   #{b > a} = n_b - searchsorted(b_sorted, a, "right")
+    # y los empates (b == a) quedan EXCLUIDOS de ambos conteos (mismo trato neutral que
+    # el doble bucle: a == b no suma ni a `greater` ni a `less`). Sumando sobre todos los
+    # `a` se obtienen exactamente los mismos totales de pares que el bucle anidado:
+    #   greater = #{(a, b): a > b} = #{(a, b): b < a}
+    #   less    = #{(a, b): a < b} = #{(a, b): b > a}
+    left = np.searchsorted(b_sorted, a_arr, side="left")  # por cada a: cantidad de b < a
+    right = np.searchsorted(b_sorted, a_arr, side="right")  # por cada a: cantidad de b <= a
+    greater = int(left.sum())  # #{a > b} (pares donde b < a)
+    less = int((n_b - right).sum())  # #{a < b} (pares donde b > a)
     return (greater - less) / (n_a * n_b)
 
 
