@@ -1,0 +1,121 @@
+{
+  "dataset": "GLBX.MDP3",
+  "symbol": "NQ.c.0",
+  "stype_in": "continuous",
+  "schema": "ohlcv-1m",
+  "requested_start": "2023-09-13T00:00:00Z",
+  "requested_end": "2026-09-12T00:00:00Z",
+  "first_real_timestamp": "2023-09-13T00:00:00+00:00",
+  "last_real_timestamp": "2026-09-11T20:59:00+00:00",
+  "timezone": "UTC",
+  "databento_sdk_version": "0.86.0",
+  "download_datetime_utc": "2026-09-12T19:28:52.439567+00:00",
+  "row_count": 1050863,
+  "parquet_file_size_bytes": 20616785,
+  "file_sha256": "5be681c5f1ac4449d6dd347c7494157d2a0573f4f4d62fea5a5aee2a41eb9056",
+  "dataset_id": "5be681c5f1ac4449d6dd347c7494157d2a0573f4f4d62fea5a5aee2a41eb9056",
+  "dataset_id_note": "Provisional: se usa el file_sha256 completo como dataset_id porque la documentacion aprobada no define una convencion corta inequivoca. Definir convencion corta mas adelante.",
+  "real_cost_usd": null,
+  "estimated_cost_usd": 3.836474344134,
+  "cost_note": "real_cost_usd proviene del SDK si lo expone; si es null, usar estimated_cost_usd (get_cost, que NO consume creditos).",
+  "warmup_min": 22,
+  "warmup_definition": "warmup_min = max(fast_period, slow_period + crossover_state_requirement, atr_period + 1, volume_period) = 22 con periodos 9/21/1/14/20.",
+  "splits": {
+    "calibration": {
+      "start": "2023-09-13T00:00:00Z",
+      "end": "2025-07-01T00:00:00Z"
+    },
+    "validation": {
+      "start": "2025-07-01T00:00:00Z",
+      "end": "2026-02-02T00:00:00Z"
+    },
+    "final_oos": {
+      "start": "2026-02-02T00:00:00Z",
+      "end": "2026-09-12T00:00:00Z"
+    }
+  },
+  "integrity": {
+    "opens_ok": true,
+    "all_within_range": true,
+    "rows_before_start": 0,
+    "rows_on_or_after_end": 0,
+    "chronological_non_decreasing": true,
+    "duplicate_timestamps": 0,
+    "gaps_over_5min": 902
+  },
+  "symbology": {
+    "mappings": {
+      "NQ.c.0": [
+        {
+          "start_date": "2023-09-13",
+          "end_date": "2023-09-17",
+          "symbol": "2130"
+        },
+        {
+          "start_date": "2023-09-17",
+          "end_date": "2023-12-17",
+          "symbol": "260937"
+        },
+        {
+          "start_date": "2023-12-17",
+          "end_date": "2024-03-17",
+          "symbol": "750"
+        },
+        {
+          "start_date": "2024-03-17",
+          "end_date": "2024-06-23",
+          "symbol": "13743"
+        },
+        {
+          "start_date": "2024-06-23",
+          "end_date": "2024-09-22",
+          "symbol": "4358"
+        },
+        {
+          "start_date": "2024-09-22",
+          "end_date": "2024-12-22",
+          "symbol": "106364"
+        },
+        {
+          "start_date": "2024-12-22",
+          "end_date": "2025-03-23",
+          "symbol": "42288528"
+        },
+        {
+          "start_date": "2025-03-23",
+          "end_date": "2025-06-22",
+          "symbol": "42005804"
+        },
+        {
+          "start_date": "2025-06-22",
+          "end_date": "2025-09-21",
+          "symbol": "42008487"
+        },
+        {
+          "start_date": "2025-09-21",
+          "end_date": "2025-12-21",
+          "symbol": "158704"
+        },
+        {
+          "start_date": "2025-12-21",
+          "end_date": "2026-03-22",
+          "symbol": "42002475"
+        },
+        {
+          "start_date": "2026-03-22",
+          "end_date": "2026-06-19",
+          "symbol": "42004058"
+        },
+        {
+          "start_date": "2026-06-19",
+          "end_date": "2026-09-12",
+          "symbol": "42004177"
+        }
+      ]
+    },
+    "symbols": [
+      "NQ.c.0"
+    ]
+  },
+  "symbology_note": "NQ.c.0 es continuo y mapea a distintos contratos NQ subyacentes en el tiempo. to_parquet se llamo con map_symbols=True (por defecto), por lo que el Parquet incluye la columna 'symbol' con el raw_symbol subyacente por vela, reconstruido desde las mappings LOCALES del DBNStore (sin query adicional facturable). Las mappings completas se registran aqui. Para una tabla de rollover mas rica (p.ej. fechas exactas de roll con definiciones completas) se requeriria una llamada adicional store.request_full_definitions() / request_symbology(), que SI implica una consulta adicional (posible costo/descarga) y por eso NO se ejecuto."
+}

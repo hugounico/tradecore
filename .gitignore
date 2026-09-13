@@ -1,6 +1,9 @@
 # Environment and secrets
 .env
 
+# Kiro local settings (may contain machine-specific config / MCP references)
+.kiro/settings/
+
 # Python
 __pycache__/
 *.pyc
@@ -34,3 +37,16 @@ Thumbs.db
 
 # Logs
 *.log
+
+
+# Historical dataset binaries (Parquet). Los metadatos .meta.json SI se versionan.
+data/historical/*.parquet
+# Negacion explicita: mantener los metadatos rastreables aunque haya reglas amplias arriba.
+!data/historical/*.meta.json
+
+# Artefactos temporales de scripts (NO ocultar codigo fuente legitimo como download_historical.py)
+scripts/_download_report.txt
+scripts/_inspect_out.txt
+scripts/_download_run_decoded.txt
+scripts/_inspect_sdk.py
+scripts/_decode_log.py

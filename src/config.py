@@ -22,6 +22,15 @@ class Settings(BaseSettings):
     sma_fast_period: int = 9
     sma_slow_period: int = 21
 
+    # Etapa 1 — capas matematicas nuevas (envuelven el motor, no lo modifican)
+    # atr_period: cantidad de velas usadas para promediar el True Range (rango
+    # verdadero) al calcular el ATR (Average True Range — indicador de volatilidad).
+    # Default 14 = estandar de industria de Welles Wilder. Configurable.
+    atr_period: int = 14
+    # volume_period: cantidad de velas sobre las que se promedia el volumen para
+    # el filtro de volumen. Default 20 = estandar de industria. Configurable.
+    volume_period: int = 20
+
     # Historical data
     historical_candles: int = 50
 
