@@ -109,6 +109,69 @@ Clasificacion: `BLOCKS_IMPLEMENTATION` / `BLOCKS_PRODUCTION` / `BLOCKS_TRADER_RE
     Ciclo de vida: es de un solo uso. Tras una ejecucion autorizada, un turno documental posterior debe
     cambiar el estado a `USED`; no se reutiliza ni se renueva automaticamente. ORIGIN = APPROVED_RESTRICTION
     (excepcion de gobernanza acotada). No modifica el campo Gate de T1.5.
+  - **G0.6-EXC-1 — FINAL STATUS: USED (actualizacion aditiva; el texto historico anterior se conserva).**
+    `G0.6-EXC-1 = USED`. La excepcion fue consumida durante RUN4, cuando se recibio Y persistio el primer
+    record experimental real: tipo OHLCV, `local_sequence_number = 2`, evidencia persistida
+    incrementalmente, timestamps preservados con precision original. G0.6 permanece `OPEN`.
+    Resultado empirico RUN4: `RUN4_UNAMBIGUOUS_ASSOCIATIONS = 2`. En las dos asociaciones observadas,
+    `EOI.ts_event == OHLCV.ts_event` con `MARKET_TIMESTAMP_DELTA_SECONDS = 0`. Los dos EOI observados
+    tenian `instrument_id = 0` y `msg = "End of interval for ohlcv-1m"`. Por tanto
+    `EOI_SCOPE_EMPIRICAL_OBSERVATION = SCHEMA_IDENTIFIED_FORMAL_SCOPE_NOT_RESOLVED` (el mensaje identifica
+    directamente `ohlcv-1m`, pero con una unica configuracion observada NO quedo demostrado el scope
+    formal per-schema frente a per-subscription).
+    Suficiencia: `EVIDENCE_CLASSIFICATION = INSUFFICIENT_EMPIRICAL_EVIDENCE` porque
+    `2 < MINIMUM_UNAMBIGUOUS_ASSOCIATIONS (5)`. Se mantienen sin cambios:
+    `END_OF_INTERVAL_TIMESTAMP_MEANING = NOT_RESOLVED`;
+    `OHLCV_1M_END_OF_INTERVAL_MATCHING_RULE = NOT_RESOLVED`;
+    `END_OF_INTERVAL_CAN_BE_MATCHED_TO_OHLCV_1M = NOT_RESOLVED`;
+    `LIVE_BAR_FINALITY_CLASSIFICATION = CASE_B`. G0.7 NO se cierra.
+    Nota RUN4/RUN5-A: RUN4 no alcanzo de forma verificable `CAPTURE_WINDOW_COMPLETED` ni dejo evidencia
+    persistida que confirmara el disparo del watchdog absoluto; por tanto
+    `RUN4_HARNESS_FAILURE_ROOT_CAUSE = NOT_FULLY_RESOLVED`. RUN5-A descarto especificamente
+    `CLIENT_START_BLOCKING_HYPOTHESIS = REJECTED` mediante inspeccion del codigo fuente instalado de
+    Databento 0.86.0 (`Live.start()` es no bloqueante), y construyo/valido OFFLINE un harness nuevo:
+    `HARNESS_READY_FOR_LIVE = YES`. La validacion offline cubrio flujo normal (6 OHLCV + 6 EOI simulados),
+    cierre automatico de capture window, timeout sin evidencia, persistencia incremental, summary final,
+    teardown y watchdog de emergencia con terminacion del proceso. Esto NO constituye una demostracion
+    retrospectiva de la causa raiz de RUN4.
+
+  - **G0.6-EXC-2 — END_OF_INTERVAL_DIAGNOSTIC_PROBE_ONLY (RUN5-B — corrected offline-validated harness).**
+    ESTADO: `G0.6-EXC-2 = AUTHORIZED_NOT_USED`. Nueva autorizacion acotada porque `G0.6-EXC-1 = USED` y
+    una excepcion consumida NO puede reutilizarse. G0.6 permanece `OPEN` (esta excepcion NO resuelve,
+    cierra ni levanta G0.6 de forma general).
+    Alcance: autoriza UNA (1) futura ejecucion diagnostica Live con el harness validado offline
+    `eoi_probe_run5.py` (`HARNESS_READY_FOR_LIVE = YES`), cuyo objetivo es AUMENTAR la evidencia
+    disponible para determinar si la relacion observada en RUN4 puede verificarse o debe permanecer no
+    resuelta. NO predetermina el resultado: RUN5-B debe poder aportar evidencia consistente O detectar
+    evidencia contradictoria (la hipotesis observada `EOI.ts_event == OHLCV.ts_event`,
+    `MARKET_TIMESTAMP_DELTA_SECONDS = 0`, NO se da por confirmada).
+    Configuracion INMUTABLE: `PROBE_MODE = LIVE_REAL`; `PROBE_DATASET = GLBX.MDP3`;
+    `PROBE_SCHEMA = ohlcv-1m`; `PROBE_SYMBOL = NQ.c.0`; `PROBE_STYPE_IN = continuous`. Harness autorizado:
+    `eoi_probe_run5.py`. Si cualquiera de estos parametros cambia, la excepcion queda invalidada y
+    requiere nueva autorizacion documental.
+    NO autoriza: levantar G0.6 de forma general; T1.5; Wave 2; W6; W8; integracion productiva; cambios en
+    componentes protegidos; despliegue; Replay; Historical; compras; activaciones; retries; reconnect;
+    cambio de dataset/schema/symbol/stype_in; segunda ejecucion. Ante rechazo de acceso: STOP, sin retry.
+    Regla de consumo: `G0.6-EXC-2` se considera CONSUMIDA en cuanto RUN5-B reciba Y persista el primer
+    record experimental real relevante (OHLCV o `SystemMsg` con `SystemCode.END_OF_INTERVAL`). NO depende
+    de completar la ventana, ni de obtener 3 o 5 asociaciones, ni de resolver LIVE_BAR_FINALITY. Una vez
+    persistido el primer record experimental: `G0_6_EXC_2_RUNTIME_STATUS = USED_PENDING_DOCUMENTATION`,
+    aunque RUN5-B termine luego con fallo tecnico o evidencia insuficiente. Si el acceso es rechazado
+    antes de recibir cualquier record experimental, la excepcion NO se considera consumida.
+    Regla acumulativa pre-bloqueada: `CUMULATIVE_MINIMUM_UNAMBIGUOUS_ASSOCIATIONS = 5`;
+    `RUN4_VALID_ASSOCIATIONS_CARRIED_FORWARD = 2`; `ADDITIONAL_UNAMBIGUOUS_ASSOCIATIONS_REQUIRED = 3`. Las
+    asociaciones RUN4 solo pueden acumularse con RUN5-B si: configuracion identica, criterio de asociacion
+    identico, nuevas asociaciones inequivocas y ninguna contradiccion no explicada. Para declarar
+    `EMPIRICALLY_VERIFIED_FOR_PROBE_CONFIGURATION` se requiere: >= 5 asociaciones inequivocas acumuladas,
+    relacion consistente y ninguna contradiccion no explicada. Alcanzar numericamente 5 NO basta si
+    aparece cualquier contradiccion no explicada; en ese caso NO declarar suficiencia ni cerrar
+    LIVE_BAR_FINALITY.
+    Ventana de captura futura: aunque bastan 3 asociaciones adicionales para el umbral acumulado, NO
+    terminar la captura al obtener la tercera; mantener la ventana completa definida por el harness
+    validado (salvo condicion de seguridad/timeout ya prevista) para maximizar la deteccion de
+    contradicciones. NO cambiar ahora los parametros temporales ya validados del harness.
+    Condicion de uso: requiere autorizacion EXPLICITA del usuario en un turno posterior (este turno NO es
+    esa autorizacion). ORIGIN = APPROVED_RESTRICTION. No modifica el campo Gate de T1.5.
 - **G0.7 — Candle timestamp semantics.** Por que: define `signal_market_timestamp` canonico y alineacion
   TradingView. Alimentado por T0.1. Bloquea: T3.5 (timestamps de Capa 1), T7 time tests, W9. Resolver
   antes de W3. BLOCKS_IMPLEMENTATION.
