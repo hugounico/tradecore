@@ -87,6 +87,28 @@ Clasificacion: `BLOCKS_IMPLEMENTATION` / `BLOCKS_PRODUCTION` / `BLOCKS_TRADER_RE
   (restriccion de gobernanza CONGELADA, no una hipotesis comercial). El plan Standard SI esta exigido
   explicitamente por el steering aprobado, por lo que se conserva el nombre del Gate (no se reformula a
   "verify entitlement" generico). NO se investiga precio ni se consulta Databento en este turno.
+  - **G0.6-EXC-1 — END_OF_INTERVAL_DIAGNOSTIC_PROBE_ONLY (excepcion acotada de G0.6).**
+    ESTADO: `G0.6-EXC-1 = AUTHORIZED_NOT_USED`. G0.6 permanece `OPEN` (esta excepcion NO resuelve,
+    cierra ni levanta G0.6). Alcance: autoriza UNA (1) ejecucion diagnostica, manual, temporal, aislada
+    y FUERA del repositorio, cuyo unico objetivo es observar la relacion entre
+    `SystemMsg(END_OF_INTERVAL).ts_event` y `OHLCV(ohlcv-1m).ts_event` para obtener evidencia empirica
+    destinada a resolver `LIVE_BAR_FINALITY` (actualmente CASE_B).
+    Configuracion BLOQUEADA (EXCEPTION_CONFIGURATION_LOCKED = YES): `PROBE_MODE = LIVE_REAL`;
+    `PROBE_DATASET = GLBX.MDP3`; `PROBE_SCHEMA = ohlcv-1m`; `PROBE_SYMBOL = NQ.c.0`;
+    `PROBE_STYPE_IN = continuous`; `PROBE_SAMPLE_TARGET = 5`. Si cualquiera de estos parametros cambia,
+    la excepcion queda `INVALIDATED_BY_CONFIGURATION_CHANGE` y requiere nueva autorizacion documental.
+    NO autoriza: levantar G0.6; T1.5; W6; W8; integracion productiva; despliegue; modificacion de
+    componentes protegidos; ejecucion Live general; futuras ejecuciones Live; Replay; cambio de
+    dataset/schema/instrumento/stype; compra de plan; activacion de plan; retry ante entitlement;
+    workaround ante errores de acceso.
+    Condicion de uso: requiere autorizacion EXPLICITA del usuario en un turno posterior (este turno NO
+    es esa autorizacion). La ejecucion futura debe aplicar STOP inmediato ante authentication failure,
+    entitlement/access denied, dataset/schema/symbol/stype rechazado, necesidad de compra o activacion,
+    configuracion distinta de la autorizada, o necesidad de tocar codigo/componente protegido; sin
+    retry, sin workaround, sin compra, sin activacion.
+    Ciclo de vida: es de un solo uso. Tras una ejecucion autorizada, un turno documental posterior debe
+    cambiar el estado a `USED`; no se reutiliza ni se renueva automaticamente. ORIGIN = APPROVED_RESTRICTION
+    (excepcion de gobernanza acotada). No modifica el campo Gate de T1.5.
 - **G0.7 — Candle timestamp semantics.** Por que: define `signal_market_timestamp` canonico y alineacion
   TradingView. Alimentado por T0.1. Bloquea: T3.5 (timestamps de Capa 1), T7 time tests, W9. Resolver
   antes de W3. BLOCKS_IMPLEMENTATION.
