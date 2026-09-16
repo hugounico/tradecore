@@ -242,6 +242,89 @@ Clasificacion: `BLOCKS_IMPLEMENTATION` / `BLOCKS_PRODUCTION` / `BLOCKS_TRADER_RE
     revision y aceptacion de este cierre documental; (2) un turno documental separado; (3) autorizacion
     explicita posterior. No se incluyen aqui condiciones, configuracion ni reglas propuestas para EXC-3.
     ORIGIN = APPROVED_RESTRICTION. No modifica el campo Gate de T1.5.
+
+  - **G0.6-EXC-3 — PROPOSED END_OF_INTERVAL DIAGNOSTIC PROBE ONLY (RUN6 — instrumented harness).**
+    ESTADO: `G0_6_EXC_3_STATUS = PROPOSED_NOT_AUTHORIZED`. Este bloque es SOLO un DISEÑO para revision
+    humana posterior; NO autoriza ninguna ejecucion. `G0_6_EXC_3_EXECUTION_AUTHORIZED = NO`;
+    `LIVE_EXECUTION_AUTHORIZED_BY_THIS_BLOCK = NO`; `RUN6_EXECUTION_AUTHORIZED = NO`. NO es
+    `AUTHORIZED_NOT_USED`. G0.6 permanece `OPEN` (esta propuesta NO resuelve, cierra ni levanta G0.6).
+    Contexto de gates (solo registro documental, sin modificar bloques): `T1_5_LITERAL_GATE = G0.6`
+    (el Gate literal de T1.5 es G0.6, no una referencia a CASE_B). `T1_5_G0_7_RELATION = NOT_EXPLICIT`:
+    la Spec no establece una dependencia de gate explicita de T1.5 respecto de G0.7/LIVE_BAR_FINALITY; el
+    Design vincula `subscribe_live()` con la semantica de vela cerrada / LIVE_BAR_FINALITY (B.14) a nivel
+    conceptual/arquitectonico, pero NO como gate formal en el bloque de T1.5. Esta propuesta NO fusiona
+    G0.6 con G0.7, NO cierra G0.7 y NO cambia `LIVE_BAR_FINALITY_CLASSIFICATION = CASE_B`.
+
+    Harness propuesto: `eoi_probe_run5d.py`
+    (SHA-256 `3adb1266a93517ea04b9eba062068ce1e7982aa576a278f8d1d31ce0dffee360`).
+    `FUNCTIONAL_CONTROL_CHANGE_COUNT = 0`; `HARNESS_OFFLINE_VALIDATED = YES`;
+    `HARNESS_READY_FOR_AUTHORIZATION_REVIEW = YES` (esto NO equivale a autorizacion Live). Antes de
+    cualquier FUTURA ejecucion autorizada debera RECALCULARSE el SHA-256 del archivo en disco; si no
+    coincide exactamente con el hash anterior: STOP sin conectar. La propuesta EXC-3 queda vinculada a
+    ESTE hash concreto; cualquier modificacion futura del harness invalida esta propuesta y requiere nueva
+    revision documental.
+
+    Configuracion propuesta e INMUTABLE (para una eventual ejecucion futura): `PROBE_MODE = LIVE_REAL`;
+    `PROBE_DATASET = GLBX.MDP3`; `PROBE_SCHEMA = ohlcv-1m`; `PROBE_SYMBOL = NQ.c.0`;
+    `PROBE_STYPE_IN = continuous`; `RECONNECT_POLICY = NONE`; maximo `ONE_PHYSICAL_LIVE_CONNECTION`. Sin
+    retry, sin reconnect, sin Replay, sin Historical, sin compra, sin activacion, sin workaround de
+    acceso, sin segunda conexion. Ante rechazo de acceso: STOP. El mero intento de conexion NO consume la
+    excepcion.
+
+    Regla de consumo propuesta: si EXC-3 fuera autorizada posteriormente, se considerara consumida
+    unicamente cuando se reciba Y persista el primer record experimental real pertinente. La conexion por
+    si sola NO consume la excepcion; un rechazo de acceso antes de recibir/persistir evidencia NO la
+    consume. Una vez recibido Y persistido el primer record experimental, la excepcion queda consumida
+    aunque posteriormente falle el harness, no se complete la ventana, no se alcance la asociacion #5 u
+    ocurra una contradiccion.
+
+    Objetivo empirico: buscar evidencia adicional suficiente para evaluar el umbral minimo predefinido.
+    Estado previo: `CUMULATIVE_UNAMBIGUOUS_ASSOCIATIONS = 4`; `MINIMUM_REQUIRED = 5`; por tanto
+    `MINIMUM_ADDITIONAL_UNAMBIGUOUS_ASSOCIATIONS_NEEDED = 1`. La captura NO debe finalizar automaticamente
+    al obtener la primera asociacion nueva; debe intentar completar la ventana de captura predefinida para
+    maximizar la oportunidad de detectar asociaciones adicionales, ambiguedades, contradicciones y
+    comportamiento diagnostico del harness.
+
+    Regla de evidencia y contradiccion: el umbral `>=5` es condicion minima de evidencia, NO garantia
+    automatica de verificacion. Se mantiene `NUMERIC_THRESHOLD_REACHED != AUTOMATIC_VERIFICATION`. Una
+    observacion nueva con delta distinto del patron observado, asociacion ambigua, relacion no explicada o
+    inconsistencia material con RUN4/RUN5-B debe impedir una clasificacion positiva automatica hasta ser
+    analizada. Si aparece cualquier contradiccion no explicada: `CONTRADICTION_DETECTED = YES` y NO
+    declarar `EMPIRICALLY_VERIFIED_FOR_PROBE_CONFIGURATION` aunque
+    `CUMULATIVE_UNAMBIGUOUS_ASSOCIATIONS >= 5`.
+
+    Scope y semantica: la eventual obtencion de >=5 asociaciones NO debe por si sola convertir
+    observaciones empiricas en garantia protocolaria general. Se mantienen como cuestiones independientes:
+    `EOI_SCOPE_EMPIRICAL_OBSERVATION`; `END_OF_INTERVAL_TIMESTAMP_MEANING`;
+    `OHLCV_1M_END_OF_INTERVAL_MATCHING_RULE`; `END_OF_INTERVAL_CAN_BE_MATCHED_TO_OHLCV_1M`. Cualquier
+    cambio futuro de estas clasificaciones requiere analisis posterior de la evidencia. EXC-3 por si misma
+    NO modifica estas variables.
+
+    Observabilidad diagnostica (finalidad secundaria del harness instrumentado: aportar observabilidad si
+    reaparece la anomalia de cierre). Los siguientes son PATRONES OBSERVABLES, NO causas demostradas:
+    - D1 `OBSERVED_CONTROLLER_DEADLINE_EXIT_ANOMALY` — heartbeats del controller continuan;
+      `controller_now >= capture_deadline`; no aparece el milestone de finalizacion esperado. NO identifica
+      automaticamente la causa.
+    - D2 `CONTROLLER_PROGRESS_NOT_OBSERVED` — la secuencia de heartbeat del controller deja de avanzar
+      antes del cierre esperado. NO afirmar automaticamente que el controller murio o se bloqueo.
+    - D3 `CALLBACK_PROGRESS_NOT_OBSERVED` — heartbeats del controller continuan; `callback_invocation_count`
+      deja de aumentar; `last_callback_monotonic` permanece sin cambio. NO etiquetar automaticamente como
+      fallo SDK->callback.
+    - D4 `EXPERIMENTAL_RECORD_PROGRESS_NOT_OBSERVED` — controller heartbeat continua; callback
+      observability continua; no se persisten nuevos OHLCV/EOI pertinentes. NO atribuir automaticamente a
+      mercado, proveedor, SDK o harness.
+    - D5 `WATCHDOG_EXPECTED_ACTION_NOT_OBSERVED` — se supera el deadline absoluto esperado; no aparece el
+      milestone del watchdog; no se observa el forced exit esperado. NO inferir automaticamente una causa
+      global del proceso.
+
+    Regla epistemica: se mantienen `RUN5B_HARNESS_FAILURE_ROOT_CAUSE = NOT_FULLY_RESOLVED`;
+    `RECORD_FLOW_CESSATION_CAUSE = NOT_RESOLVED`; `REAL_LIVE_EXECUTION_SPECIFIC_FACTOR =
+    POSSIBLE_NOT_DEMONSTRATED`. La futura RUN6 PUEDE aportar evidencia diagnostica, pero NO garantiza que
+    vaya a identificar una causa raiz.
+
+    Para avanzar posteriormente se requerira: (1) revisar este diff; (2) aprobar el diseño; (3) crear un
+    commit documental separado; (4) dar autorizacion explicita de ejecucion en un turno posterior. Este
+    turno NO autoriza RUN6. ORIGIN = APPROVED_RESTRICTION. No modifica el campo Gate de T1.5.
 - **G0.7 — Candle timestamp semantics.** Por que: define `signal_market_timestamp` canonico y alineacion
   TradingView. Alimentado por T0.1. Bloquea: T3.5 (timestamps de Capa 1), T7 time tests, W9. Resolver
   antes de W3. BLOCKS_IMPLEMENTATION.
