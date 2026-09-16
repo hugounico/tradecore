@@ -172,6 +172,76 @@ Clasificacion: `BLOCKS_IMPLEMENTATION` / `BLOCKS_PRODUCTION` / `BLOCKS_TRADER_RE
     contradicciones. NO cambiar ahora los parametros temporales ya validados del harness.
     Condicion de uso: requiere autorizacion EXPLICITA del usuario en un turno posterior (este turno NO es
     esa autorizacion). ORIGIN = APPROVED_RESTRICTION. No modifica el campo Gate de T1.5.
+  - **G0.6-EXC-2 — FINAL STATUS: USED (actualizacion aditiva; el texto historico anterior se conserva).**
+    `G0_6_EXC_2_FINAL_STATUS = USED`. La excepcion fue consumida durante la ejecucion
+    `RUN_ID = RUN5B_20260916T000839Z`. `LIVE_GLBX_MDP3_ACCESS = GRANTED`;
+    `FIRST_EXPERIMENTAL_RECORD_TYPE = OHLCV`; `EXPERIMENTAL_RECORD_RECEIVED = YES`;
+    `EXCEPTION_CONSUMED = YES`. La excepcion quedo consumida cuando el primer record experimental real fue
+    recibido Y persistido. El `AUTHORIZED_NOT_USED` del bloque historico anterior describe unicamente el
+    estado previo a RUN5-B y NO se reescribe retrospectivamente.
+
+    Evidencia empirica RUN5-B: `RUN5B_UNAMBIGUOUS_ASSOCIATIONS = 2`; `RUN5B_AMBIGUOUS_ASSOCIATIONS = 0`;
+    `RUN5B_CONTRADICTORY_UNAMBIGUOUS_ASSOCIATIONS = 0`. En las dos asociaciones se observo
+    `EOI.ts_event == OHLCV.ts_event` con `MARKET_TIMESTAMP_DELTA_SECONDS = 0`, consistente con RUN4.
+    Observacion comun: `EOI.instrument_id = 0`, `msg = "End of interval for ohlcv-1m"`. La proximidad
+    temporal de llegada NO se convierte en regla normativa de matching.
+
+    Acumulacion RUN4 + RUN5-B: `CUMULATIVE_ASSOCIATION_STATUS = ACCUMULABLE` porque ambas ejecuciones
+    usaron la misma configuracion pertinente (`dataset = GLBX.MDP3`; `schema = ohlcv-1m`; `symbol = NQ.c.0`;
+    `stype_in = continuous`) y el mismo criterio empirico de asociacion. Resultado:
+    `RUN4_UNAMBIGUOUS_ASSOCIATIONS = 2`; `RUN5B_UNAMBIGUOUS_ASSOCIATIONS = 2`;
+    `CUMULATIVE_UNAMBIGUOUS_ASSOCIATIONS = 4`; `CUMULATIVE_MINIMUM_UNAMBIGUOUS_ASSOCIATIONS = 5`;
+    `ASSOCIATIONS_STILL_NEEDED = 1`; `CUMULATIVE_DELTA_PATTERN = 4/4 delta 0 s`; `CONTRADICTION_DETECTED = NO`;
+    `AMBIGUOUS_ASSOCIATIONS_CUMULATIVE = 0`.
+
+    Clasificacion metodologica: `EMPIRICAL_EVIDENCE_STATUS = INSUFFICIENT_EMPIRICAL_EVIDENCE` porque `4 < 5`.
+    `NUMERIC_THRESHOLD_REACHED = NO`. Se conserva la regla `NUMERIC_THRESHOLD_REACHED != AUTOMATIC_VERIFICATION`.
+    El umbral NO se reduce retrospectivamente.
+
+    Semantica y scope aun no resueltos (las cuatro asociaciones consistentes NO convierten una observacion
+    empirica en garantia de protocolo): `EOI_SCOPE_EMPIRICAL_OBSERVATION = SCHEMA_IDENTIFIED_FORMAL_SCOPE_NOT_RESOLVED`;
+    `END_OF_INTERVAL_TIMESTAMP_MEANING = NOT_RESOLVED`; `OHLCV_1M_END_OF_INTERVAL_MATCHING_RULE = NOT_RESOLVED`;
+    `END_OF_INTERVAL_CAN_BE_MATCHED_TO_OHLCV_1M = NOT_RESOLVED`. NO se afirma scope formal per-schema, scope
+    formal per-subscription, regla normativa de adjacency, ni semantica protocolaria general basada solo en
+    estas cuatro observaciones.
+
+    Live bar finality: `LIVE_BAR_FINALITY_CLASSIFICATION = CASE_B` (sin cambios). Por tanto
+    `G0.7 = PARTIALLY_RESOLVED` y la parte `LIVE_BAR_FINALITY` permanece bloqueante; G0.7 NO se cierra.
+
+    Anomalia RUN5-B (registro estrictamente factual): RUN5-B NO persistio `CAPTURE_WINDOW_COMPLETED`,
+    `ABSOLUTE_WATCHDOG`, `TEARDOWN_START` ni `TEARDOWN_END`. El traceback de la terminacion manual mostro al
+    hilo principal dentro de `controller_loop -> time.sleep(self.POLL)`; por tanto
+    `CONTROLLER_ALIVE_AT_MANUAL_INTERRUPTION = VERIFIED`. Queda rechazada la hipotesis previa de que, en ese
+    instante, el hilo principal estuviera bloqueado dentro de una llamada nativa del SDK. Se mantiene
+    `RUN5B_HARNESS_FAILURE_ROOT_CAUSE = NOT_FULLY_RESOLVED` y `RECORD_FLOW_CESSATION_CAUSE = NOT_RESOLVED`. NO
+    se afirma causa compartida entre ambas anomalias.
+
+    RUN5-C (exclusivamente offline): `PURE_DEADLINE_COMPARISON_RESULT = NORMAL`;
+    `INTEGRATED_CONTROLLER_FAKE_RESULT = CAPTURE_WINDOW_COMPLETED`; `MULTI_THREAD_STATE_VISIBILITY_TEST = PASS`;
+    `MULTI_THREAD_TEST_REPETITIONS = 5000`; `ACCELERATED_RUN5B_RELATION_TEST = CAPTURE_WINDOW_COMPLETED`;
+    `WATCHDOG_STANDALONE_TEST_RESULT = PASS`; `DEADLINE_BRANCH_BUG_REPRODUCED = NO`. La anomalia RUN5-B NO fue
+    reproducida mediante las pruebas offline realizadas. Esto NO identifica una causa raiz.
+
+    Correccion epistemica: `REAL_LIVE_EXECUTION_SPECIFIC_FACTOR = POSSIBLE_NOT_DEMONSTRATED`. Significa que
+    existen diferencias entre una ejecucion Live real y las reproducciones offline realizadas, pero NO se ha
+    demostrado que una de esas diferencias sea la causa de la anomalia. No se afirma que el problema apunte al
+    SDK, que el SDK sea la causa probable, que la interaccion Live sea la explicacion restante, ni que la
+    anomalia solo pueda reproducirse con Live.
+
+    RUN5-D creo, FUERA del repositorio, `eoi_probe_run5d.py`
+    (SHA-256 `3adb1266a93517ea04b9eba062068ce1e7982aa576a278f8d1d31ce0dffee360`), preservando el harness base
+    `eoi_probe_run5.py` (SHA-256 `87be3130df9e1f757fb8d62c96f918293b2be4191f69bab6702993b7d1d73c83`).
+    `FUNCTIONAL_CONTROL_CHANGE_COUNT = 0`; `CONTROL_LOGIC_UNCHANGED_FROM_RUN5 = YES`;
+    `HEARTBEAT_LOGGING_VERIFIED = YES`; `CALLBACK_OBSERVABILITY_VERIFIED = YES`;
+    `EXECUTION_MANIFEST_VERIFIED = YES`; `OBSERVABILITY_PERTURBATION_DETECTED = NO`;
+    `OFFLINE_SELFTEST_RESULT = PASS`; `HARNESS_OFFLINE_VALIDATED = YES`;
+    `HARNESS_READY_FOR_AUTHORIZATION_REVIEW = YES`. `HARNESS_READY_FOR_AUTHORIZATION_REVIEW = YES` NO significa
+    Live autorizado, EXC-3 autorizada, G0.6 resuelto ni produccion autorizada.
+
+    G0.6-EXC-3: `G0_6_EXC_3_CREATED = NO`; `G0_6_EXC_3_AUTHORIZED = NO`. Su eventual creacion requiere: (1)
+    revision y aceptacion de este cierre documental; (2) un turno documental separado; (3) autorizacion
+    explicita posterior. No se incluyen aqui condiciones, configuracion ni reglas propuestas para EXC-3.
+    ORIGIN = APPROVED_RESTRICTION. No modifica el campo Gate de T1.5.
 - **G0.7 — Candle timestamp semantics.** Por que: define `signal_market_timestamp` canonico y alineacion
   TradingView. Alimentado por T0.1. Bloquea: T3.5 (timestamps de Capa 1), T7 time tests, W9. Resolver
   antes de W3. BLOCKS_IMPLEMENTATION.
