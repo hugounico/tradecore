@@ -244,8 +244,8 @@ Clasificacion: `BLOCKS_IMPLEMENTATION` / `BLOCKS_PRODUCTION` / `BLOCKS_TRADER_RE
     ORIGIN = APPROVED_RESTRICTION. No modifica el campo Gate de T1.5.
 
   - **G0.6-EXC-3 — PROPOSED END_OF_INTERVAL DIAGNOSTIC PROBE ONLY (RUN6 — instrumented harness).**
-    ESTADO: `G0_6_EXC_3_STATUS = PROPOSED_NOT_AUTHORIZED`. Este bloque es SOLO un DISEÑO para revision
-    humana posterior; NO autoriza ninguna ejecucion. `G0_6_EXC_3_EXECUTION_AUTHORIZED = NO`;
+    ESTADO: `G0_6_EXC_3_STATUS = AUTHORIZED_NOT_USED`. Este bloque es SOLO un DISEÑO para revision
+    humana posterior; NO autoriza ninguna ejecucion. `G0_6_EXC_3_EXECUTION_AUTHORIZED = YES`;
     `LIVE_EXECUTION_AUTHORIZED_BY_THIS_BLOCK = NO`; `RUN6_EXECUTION_AUTHORIZED = NO`. NO es
     `AUTHORIZED_NOT_USED`. G0.6 permanece `OPEN` (esta propuesta NO resuelve, cierra ni levanta G0.6).
     Contexto de gates (solo registro documental, sin modificar bloques): `T1_5_LITERAL_GATE = G0.6`
