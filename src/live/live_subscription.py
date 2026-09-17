@@ -183,6 +183,12 @@ class LiveSubscription:
             stop()
         except Exception as exc:  # NO BaseException: preserva CancelledError y la excepcion primaria
             logger.warning("Error al cerrar el cliente Live (se ignora, no enmascara): %s", exc)
+        else:
+            # Camino EXITOSO observable: `stop()` fue invocado y retorno sin excepcion. Permite
+            # distinguir inequivocamente el cierre EXPLICITO del cierre implicito por GC/__del__.
+            # NOTA: `stop()` es NO bloqueante -> esto NO afirma que el socket ya se cerro fisicamente,
+            # solo que la SOLICITUD de stop se realizo correctamente.
+            logger.info("Explicit Databento Live stop requested successfully")
 
     # ---- reconexion (reuso de T1.4, sin duplicar backoff) ----
     async def reconnect(self) -> ReconnectOutcome:
