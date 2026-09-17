@@ -1312,3 +1312,108 @@ modifica la arquitectura ahora.
 - Nota de entorno: la `.venv` local carecia de `uvicorn` (declarado en `requirements.txt`); se restauro
   `uvicorn[standard]` en la `.venv` para poder ejecutar el comando canonico. Esto NO modifica el artefacto
   `d363e0d` (los SHA-256 de los 6 archivos clave quedaron identicos antes y despues de la corrida).
+
+---
+
+# ETAPA 1 LIVE — LIFECYCLE FIX + FRONTEND REHEARSAL (turno offline; aditivo, no reescribe lo anterior)
+
+> Turno 100% OFFLINE respecto de Databento (NO se abrio Databento Live; NO db.Live real;
+> `LIVE_CLIENT_CREATED_THIS_TURN = NO`, `LIVE_CONNECTION_ATTEMPTED_THIS_TURN = NO`). Base
+> `HEAD = ef4f9d06693342f33c4bf945fe71e2d77164db4a`. NO push este turno.
+
+## Estado de capas (separado por capa; sin inferir una desde otra)
+
+- `BACKEND_LIVE_PATH = VERIFIED` (turno Live anterior; sin cambios).
+- `REAL_WS_DELIVERY = VERIFIED` (turno Live anterior; reconfirmado el contrato WS este turno con un
+  cliente WS independiente contra un servidor scratch que reproduce el contrato real).
+- `BROWSER_DASHBOARD_PATH = COMPONENTS_VERIFIED_BROWSER_EXECUTION_PENDING`. En el ensayo offline de este
+  turno se sirvio el `dashboard/index.html` REAL sin modificar (HTTP 200, 14163 bytes, contiene
+  Lightweight Charts CDN + `/ws/chart` + `handleCandle`) y se entrego el fixture real por `/ws/chart` en
+  el shape de lote real (`json.dumps([msg])`). La ejecucion del JS del navegador (`ws.onmessage` ->
+  `handleBatch` -> `handleMessage` -> `handleCandle` -> `candlestickSeries.update`) NO se ejercito: este
+  entorno no puede lanzar un navegador ni capturar pantalla.
+- `VISUAL_RENDER = NOT_VERIFIED` (`VISUAL_CONFIRMATION_REQUIRES_HUMAN = YES`).
+- `FIRST_FUNCTIONAL_CHART_COMPOSITE_STATUS = VISUAL_CONFIRMATION_PENDING`.
+- `FULL_LIVE_END_TO_END_VISUALLY_VERIFIED = NO` (Databento real y navegador real aun NO se ejercitaron
+  simultaneamente; eso es el proximo turno con Hugo observando el navegador en vivo).
+
+## Ensayo frontend offline — 8 observaciones (cada una con evidencia propia)
+
+1. `DASHBOARD_HTML_LOADED = YES` (GET `/` = 200, sirviendo el archivo real; server-side).
+2. `DASHBOARD_JS_EXECUTED = NOT_VERIFIABLE` (requiere motor JS de navegador).
+3. `DASHBOARD_WS_CLIENT_CONNECTED = YES` (por cliente WS headless que hace de stand-in del navegador,
+   NO por la pagina en navegador).
+4. `DASHBOARD_PAYLOAD_RECEIVED = YES` (por el cliente WS headless; fixtures exactos, ver abajo).
+5. `DASHBOARD_HANDLER_EXECUTED = NOT_VERIFIABLE` (navegador).
+6. `HANDLE_CANDLE_EXECUTED = NOT_VERIFIABLE` (navegador).
+7. `CHART_UPDATE_CALL_OBSERVED = NOT_VERIFIABLE` (navegador; sin log en la ruta de candle).
+8. `VISUAL_CANDLE_RENDER_CONFIRMED = NOT_VERIFIABLE` (requiere confirmacion humana en navegador).
+
+Contrato + fixture verificados en la capa de entrega (cliente WS independiente, aiohttp):
+`is_batch_array = True`; status entregado exacto `[{"type":"status","data":{"connected":true,"last_candle_time":null,"mode":"live"}}]`;
+candle entregado exacto `[{"type":"candle","data":{"time":1789673760,"open":29463.5,"high":29466.0,"low":29462.5,"close":29462.5,"volume":62}}]`.
+`FIXTURE_PROVENANCE`: registro documental de `RUN_ID = FIRST_CHART_LIVE_20260917T192356Z` (este mismo
+archivo, commit `ef4f9d06`); el log crudo de frames del turno anterior era temporal y fue removido, por lo
+que la evidencia persistida del fixture es documental, no un log crudo. `FIXTURE_MATCHES_REPORTED_VALUES = YES`.
+
+## Auditoria de timestamp / contrato
+
+- `BACKEND_TIME_UNIT = Unix epoch SECONDS` (`int(candle.timestamp.timestamp())` en `ThrottledPusher.queue_candle`).
+- `DASHBOARD_EXPECTED_TIME_UNIT = Unix epoch SECONDS` (Lightweight Charts v4.2.0 `UTCTimestamp` = segundos;
+  el dashboard pasa `data` directo a `candlestickSeries.update`, sin conversion a ms).
+- `FIXTURE_TIME_INTERPRETATION_UTC`: `1789673760` como segundos = `2026-09-17T19:36:00Z` (coherente con la
+  fecha/hora del run, tz -03:00 ~16:36 local). Como ms daria 1970 (absurdo). `TIMESTAMP_ANOMALY = NO`.
+- Compatibilidades: `WS_TO_DASHBOARD_SCHEMA_COMPATIBILITY = COMPATIBLE`; `TIME_FORMAT_COMPATIBILITY = COMPATIBLE`;
+  `NUMERIC_FORMAT_COMPATIBILITY = COMPATIBLE`; `STATUS_MODE_COMPATIBILITY = COMPATIBLE`.
+- `FRONTEND_DEPENDENCY_SOURCE = CDN` (unpkg `lightweight-charts@4.2.0`, unica dependencia externa;
+  `DATABENTO_OFFLINE_TEST = YES`, `NETWORK_OFFLINE_TEST_POSSIBLE = NO` — el chart lib requiere el CDN; NO se
+  vendoriza al repo).
+
+## Cierre explicito del cliente Databento (deuda de ciclo de vida)
+
+- `SELECTED_EXPLICIT_CLOSE_PRIMITIVE = stop()`. Justificacion por evidencia del SDK real (databento 0.86.0):
+  `Live.stop()` es el cierre GRACIOSO ("finish processing received records"), NO bloqueante, y se auto-protege
+  (`if not is_connected(): return`); `Live.terminate()` es el cierre inmediato/emergencia (el que ya usa
+  `Live.__del__`). Antes del fix el cierre real dependia solo del GC (`__del__ -> terminate`).
+- Implementacion (solo `src/live/live_subscription.py`, NO protegido): el `finally` de `subscribe_live()`
+  ejecuta `mark_disconnected()` y luego `_close_client(client)` UNA sola vez por invocacion; `_close_client`
+  llama `client.stop()` capturando solo `Exception` (NO `BaseException`), de modo que NO enmascara
+  `CancelledError` ni la excepcion primaria del stream/mapper; el error de cierre se registra con logging.
+  `LiveCandleSource.stop()` permanece no-op (el dueno del ciclo de vida es `LiveSubscription`).
+- `LIVE_CLIENT_EXPLICIT_CLOSE_IMPLEMENTATION = VERIFIED_BY_TESTS`. `EXPLICIT_CLOSE_TEST_MATRIX`:
+  A (terminacion normal -> cierre 1 vez) = PASS; B (cancelacion asyncio -> finally corre, desconectado,
+  cierre 1 vez, CancelledError preservado) = PASS; C (excepcion del stream -> cierre 1 vez, excepcion primaria
+  observable) = PASS; D (el cierre lanza -> no enmascara el error primario) = PASS; E (camino normal ->
+  sin doble cierre) = PASS.
+- `LIVE_CANDLE_PARTIAL_STATUS = NOT_VERIFIED` (la hipotesis de "vela parcial" del reporte anterior no tiene
+  evidencia directa; no se resuelve este turno).
+
+## Shutdown — separacion explicita de capas
+
+- `SERVER_LIFESPAN_SHUTDOWN_VERIFIED = YES`. Se corrigio el defecto metodologico del run anterior (hard-kill):
+  se levanto el servidor real Uvicorn en `MODE=simulation` (sin Databento; clave dummy -> historical 401
+  capturado -> "Simulation will not run", NO se creo cliente Live) y se envio una senal de apagado normal
+  equivalente a teclado en Windows (`CREATE_NEW_PROCESS_GROUP` + `CTRL_BREAK_EVENT`). Log observado:
+  "Shutting down" -> "Waiting for application shutdown." -> "TradeCore shutdown complete." ->
+  "Application shutdown complete." -> "Finished server process". Proceso terminado, puerto liberado, sin
+  huerfanos.
+- `REAL_DATABENTO_CLIENT_GRACEFUL_SHUTDOWN_VERIFIED = NO`. IMPORTANTE: lo anterior valida el shutdown del
+  SERVIDOR (lifespan), NO el cierre gracioso de un cliente Databento REAL. La rama simulation no crea cliente
+  Live, por lo que la ruta `_close_client` NO se ejercito contra un cliente Databento real en este turno.
+  `LIVE_GRACEFUL_SHUTDOWN_STATUS = NOT_TESTED_WITH_NORMAL_LIVE_SERVER_SHUTDOWN` (se refiere especificamente al
+  cliente Databento real; permanece pendiente hasta la proxima ejecucion Live real con shutdown normal).
+- NO se declara "DEBT = RESOLVED" de forma absoluta: la implementacion del cierre explicito esta verificada por
+  tests (mock), y el shutdown del servidor por senal normal esta verificado; lo que resta es observar el cierre
+  gracioso del cliente Databento REAL bajo shutdown normal en la proxima conexion Live.
+
+## Entorno / regresion (este turno)
+
+- Regresion: suite completa deterministica (`-p no:randomly`) = 375 tests, EXACTAMENTE 12 fallos (los 12
+  spec-ahead conocidos del conector), 0 errores. `NEW_UNEXPECTED_FAILURES = 0`. (Una corrida con orden
+  aleatorio de `pytest-randomly` mostro 4 fallos extra en `test_e2e`/`test_config` por polucion de orden entre
+  tests preexistente; NO reproducibles en aislamiento ni con orden fijo; NO atribuibles al cambio de
+  `live_subscription.py`.) `pip check` limpio.
+- `REQUIREMENTS_ENV_SYNC = PASS`. `uvicorn`/`websockets` ya estaban instalados (restauracion previa de una
+  dependencia ya declarada en `requirements.txt`); no se instalo ni desinstalo nada este turno.
+- Commit A (codigo): `LIFECYCLE_COMMIT_HASH = badd9df3b68d30034aeef7ab62d252c3d0c802b2`
+  ("Etapa 1 Live: add explicit Databento client close in LiveSubscription"). Sin push.
