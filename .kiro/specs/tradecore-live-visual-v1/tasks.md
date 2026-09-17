@@ -1165,3 +1165,69 @@ dependencia de ninguna Task de Live Visual v1. No se introdujo funcionalidad fue
 - Este turno es solo planificacion: no se implemento codigo, no se ejecutaron tests/Validation/Final OOS,
   no se hizo commit ni push. `DEPLOYED_COMMIT` sigue UNKNOWN hasta la evidencia de la Linea AWS externa
   (T8.4 lo cierra para Live Visual v1).
+
+---
+
+# MILESTONE INTERMEDIO — FIRST_FUNCTIONAL_LIVE_CHART_SLICE
+
+> Seccion aditiva y delimitada. NO pertenece a los bloques T6.1/T6.2 y NO los redefine.
+> Registra un milestone vertical temprano, distinto de "T6.1 DONE" / "T6.2 DONE".
+
+**Objetivo observable:** con UNA sola conexion Databento Live, SIN reconnect, SIN warm-up completo,
+SIN gap recovery, SIN persist-before-publish ni status extendido, TradeCore recibe al menos una vela
+OHLCV-1m cerrada de NQ.c.0, la convierte a `Candle`, la entrega al `_processing_loop` existente, la
+publica por el WebSocket existente (`/ws/chart`) y permite que el dashboard existente la consuma.
+
+**Estado:**
+- `FIRST_CHART_SLICE_STATUS = AUTHORIZED_FOR_OFFLINE_IMPLEMENTATION`
+- `FIRST_CHART_SLICE_PROTECTED_CHANGE_AUTHORIZATION = GRANTED_BY_HUGO_FOR_THIS_SLICE_ONLY`
+- Archivos protegidos autorizados EXCLUSIVAMENTE para este slice: `src/connectors/databento_connector.py`,
+  `src/api/app.py`. Ningun otro archivo protegido.
+- `FIRST_CHART_LIVE_CONFIG`: dataset=GLBX.MDP3, schema=ohlcv-1m, symbol=NQ.c.0, stype_in=continuous,
+  ReconnectPolicy=NONE.
+
+**Limites explicitos (cada punto referencia los IDs para que no se lea fuera de contexto):**
+1. Este milestone NO sustituye ninguna Wave. La integracion formal sigue siendo **T6.1** (connector) y
+   **T6.2** (app.py) con sus criterios completos.
+2. NO elimina ninguna dependencia formal de **T6.1** ni de **T6.2** (ver sus bloques: T6.1 DEPENDS_ON
+   [W1(T1.1-T1.6), CP-1, CP-2, G0.6]; T6.2 DEPENDS_ON [T6.1, W2, W3, W4, T2.10, CP-2, G0.1-G0.4, G0.6]).
+3. NO marca W2/W3/W4/W5 completas; **T6.2** sigue dependiendo de W2/W3/W4/T2.10.
+4. NO marca CP-1 completo (`CP1_CURRENTLY_SATISFIED = NO`: W2-W5 no implementadas). **T6.1**/**T6.2**
+   siguen requiriendo CP-1.
+5. NO marca CP-2 formal completo. La autorizacion humana de este slice es acotada a los dos archivos
+   citados; NO es la aprobacion CP-2 general que **T6.1**/**T6.2** requieren. `CP2 != COMPLETED` (y no
+   puede completarse mientras CP-1 no este satisfecho).
+6. NO marca **T6.1** DONE. `T6_1_STATUS = IN_PROGRESS_PARTIAL_FOR_SLICE`.
+   `T6_1_REMAINING_AFTER_FIRST_CHART_SLICE` = { criterio formal "los 5 spec-ahead de LiveSubscription pasan
+   contra el connector" NO satisfecho por este slice; reconnect/retry/backoff reales; integracion completa
+   revisada bajo CP-2; G0.6 (plan Standard) para ejecucion Live general; T1.6 (mapeo) pendiente en W1 }.
+7. NO marca **T6.2** DONE. `T6_2_STATUS = IN_PROGRESS_PARTIAL_FOR_SLICE`.
+   `T6_2_REMAINING_AFTER_FIRST_CHART_SLICE` = { maquina de estados de datos W2 (WARMING_UP/SYNCING/
+   LIVE_SYNCED/...); invariante NO SIGNALS BEFORE LIVE_SYNCED; warm-up (W2)/persistencia (W3)/persist-before
+   -publish (W4); T2.10 primera-senal-post-SYNCED; gate compuesto; CP-2 general; G0.1-G0.4/G0.6 }.
+8. NO autoriza produccion.
+9. NO autoriza reconnect real (ver GATE_BEFORE_ENABLING_REAL_RECONNECT abajo). Este slice usa
+   ReconnectPolicy=NONE.
+10. NO autoriza gap recovery.
+11. NO autoriza persistence / persist-before-publish.
+12. NO modifica `SignalEngine` (SMA 9/21) ni su comportamiento.
+13. Su unica finalidad es demostrar tempranamente el vertical Live -> Candle -> backend -> WS -> dashboard,
+    reduciendo el riesgo del unico disparo Live real antes de completar **T6.1**/**T6.2** formales.
+
+---
+
+# GATE — GATE_BEFORE_ENABLING_REAL_RECONNECT
+
+`GATE_BEFORE_ENABLING_REAL_RECONNECT = OPEN`.
+
+Motivo: `LiveSubscription` y `ReconnectPolicy` mantienen maquinas de estado independientes; la
+sincronizacion es manual y suficiente para tests aislados, pero `REAL_RECONNECT_STATE_RISK = MATERIAL`
+para escenarios de reconexion concurrente/interleaved (detectado en el commit `a71be09e`, donde
+`sub.is_connected` quedaba desincronizado del resultado de la policy sin la sincronizacion manual).
+
+Condicion de cierre futura (cualquiera): arquitectura de estado resuelta a una unica fuente de verdad, O
+evidencia suficiente de correccion bajo reconexion concurrente real.
+
+Alcance del gate: NO bloquea `FIRST_FUNCTIONAL_LIVE_CHART_SLICE` (usa ReconnectPolicy=NONE, una sola
+conexion, sin reconnect) NI bloquea Wave 6 en general — solo bloquea HABILITAR reconexion real. NO se
+modifica la arquitectura ahora.

@@ -52,6 +52,19 @@ class LiveCandleSource:
         """
         return self._subscription.subscribe_live()
 
+    def stop(self) -> None:
+        """Detiene la fuente. Compatibilidad con el shutdown existente del backend.
+
+        El backend, al apagar, llama `source.stop()` (igual que hace con `SimulationReplay`). La
+        `LiveSubscription` no expone un `stop()` sincrono: el cierre real del stream Live ocurre
+        cuando el `_processing_loop` (async generator) se cancela y se ejecuta el `finally` de
+        `subscribe_live()` (que marca DISCONNECTED). Por eso este `stop()` es un no-op seguro: existe
+        para no romper el contrato de shutdown del backend sin duplicar ni forzar logica de cierre.
+        """
+        # No-op: el cierre efectivo lo realiza la cancelacion del pipeline task (finally de
+        # subscribe_live()). Se mantiene el metodo por compatibilidad con el shutdown del backend.
+        return None
+
     @property
     def is_connected(self) -> bool:
         """Estado de conexion observable, reexpuesto desde la `LiveSubscription`."""

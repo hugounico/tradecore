@@ -1,4 +1,15 @@
-"""Rehearsal E2E MOCKEADO del primer grafico Live — 100% offline, sin db.Live, sin red.
+"""Rehearsal del primer grafico Live — 100% offline, sin db.Live, sin red.
+
+CLASIFICACION: `CURRENT_REHEARSAL_CLASSIFICATION = LIVE_SOURCE_TO_WS_CONTRACT_REHEARSAL`.
+- VALOR: verifica que la fuente Live (fake record -> mapper -> LiveSubscription -> LiveCandleSource)
+  produce `Candle` cuya FORMA contractual coincide con el payload que el dashboard consume
+  (`{time, open, high, low, close, volume}`).
+- LIMITE: NO es un end-to-end real. Reconstruye el payload localmente (`_candle_to_ws_payload`) en
+  vez de atravesar el `ThrottledPusher` real; por tanto NO verifica que el Pusher real produzca esa
+  forma. La verificacion con el Pusher real vive en el rehearsal integrado
+  (`test_live_integrated_rehearsal.py`); el WebSocket real y el render del dashboard se verifican en el
+  turno del primer intento Live.
+
 
 Objetivo: ejercitar OFFLINE la cadena que usara la futura unica conexion Live real, para
 reducir el riesgo de esa conexion (que es un disparo irreversible autorizado por gate):

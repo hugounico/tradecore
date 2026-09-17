@@ -216,6 +216,30 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning("No historical candles loaded. Simulation will not run.")
 
+    elif _settings.mode == "live":
+        # FIRST_FUNCTIONAL_LIVE_CHART_SLICE (ver tasks.md): rama Live MINIMA.
+        # NO completa T6.2 (sin maquina de estados W2, sin warm-up/persistencia/persist-before-publish,
+        # sin T2.10, sin gate compuesto — ver T6_2_REMAINING_AFTER_FIRST_CHART_SLICE).
+        # Reutiliza el MISMO _processing_loop que Simulation: la fuente Live cumple CandleSource.
+        connector = DabentoConnector(
+            api_key=_settings.databento_api_key,
+            dataset=_settings.databento_dataset,
+            symbol=_settings.databento_symbol,
+            stype_in=_settings.databento_stype_in,
+        )
+        # Fuente Live que cumple CandleSource (replay()); ReconnectPolicy=NONE (una sola conexion).
+        _replay = connector.live_candle_source()
+
+        # Arranca el MISMO pipeline processing loop que consume la simulacion.
+        _pipeline_task = asyncio.create_task(_processing_loop())
+        logger.info(
+            "Live started (first functional slice): %s %s %s stype=%s, ReconnectPolicy=NONE.",
+            _settings.databento_dataset,
+            "ohlcv-1m",
+            _settings.databento_symbol,
+            _settings.databento_stype_in,
+        )
+
     yield
 
     # Shutdown: stop replay and cancel tasks

@@ -159,6 +159,40 @@ class DabentoConnector:
             logger.warning("Failed to convert record to Candle: %s", exc)
             return None
 
+    def live_candle_source(self, last_candle_time: datetime | None = None):
+        """Devuelve una fuente de velas LIVE que cumple el contrato `CandleSource`.
+
+        Integracion MINIMA del slice FIRST_FUNCTIONAL_LIVE_CHART_SLICE: expone la abstraccion
+        Live ya construida en Wave 1 (`LiveSubscription` + adaptador `LiveCandleSource`) para que
+        `app.py` seleccione la fuente Live igual que hoy selecciona `SimulationReplay`, sin que el
+        `_processing_loop` distinga el origen (ambos exponen `replay() -> AsyncIterator[Candle]`).
+
+        NO completa T6.1: no implementa el metodo `subscribe_live()` propio del connector con el
+        contrato de los 5 spec-ahead, ni reconnect/retry/backoff/gap recovery/warm-up/persistencia
+        (ver T6_1_REMAINING_AFTER_FIRST_CHART_SLICE en tasks.md). Delega, no duplica logica.
+
+        Config Live inmutable del slice: dataset/symbol/stype_in del connector, schema `ohlcv-1m`,
+        `ReconnectPolicy = NONE` (LiveSubscription no reconecta por si mismo; el slice es de una sola
+        conexion, GATE_BEFORE_ENABLING_REAL_RECONNECT = OPEN).
+
+        `last_candle_time` (opcional): ultima vela conocida para el dedup (p.ej. la ultima historica);
+        el slice puede pasar `None` (sin warm-up completo) o el tail historico si se dispone.
+        """
+        # Imports locales para no acoplar el import-time del connector (mismo patron que Historical).
+        from src.live.live_candle_source import LiveCandleSource
+        from src.live.live_subscription import LiveSubscription
+
+        subscription = LiveSubscription(
+            api_key=self._api_key,
+            dataset=self._dataset,
+            schema="ohlcv-1m",
+            symbol=self._symbol,
+            stype_in=self._stype_in,
+            last_candle_time=last_candle_time,
+            reconnect_policy=None,  # ReconnectPolicy.NONE para el slice (sin reconexion real)
+        )
+        return LiveCandleSource(subscription)
+
 
 def _convert_price(value: int | float) -> float:
     """Convert a Databento fixed-point price to float.
