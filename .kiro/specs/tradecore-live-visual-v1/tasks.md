@@ -1231,3 +1231,84 @@ evidencia suficiente de correccion bajo reconexion concurrente real.
 Alcance del gate: NO bloquea `FIRST_FUNCTIONAL_LIVE_CHART_SLICE` (usa ReconnectPolicy=NONE, una sola
 conexion, sin reconnect) NI bloquea Wave 6 en general — solo bloquea HABILITAR reconexion real. NO se
 modifica la arquitectura ahora.
+
+---
+
+# FIRST_FUNCTIONAL_LIVE_CHART_SLICE — REGISTRO DE VALIDACION LIVE (aditivo, no reescribe lo anterior)
+
+> Seccion aditiva. Registra la PRIMERA ejecucion Live real del slice. NO redefine T6.1/T6.2, NO marca
+> CP-1/CP-2 COMPLETE, NO marca T6.1/T6.2 DONE. Este turno NO modifico codigo del repo ni tests.
+
+## Datos de la corrida
+
+- `RUN_ID = FIRST_CHART_LIVE_20260917T192356Z`
+- `HEAD_PROBADO = d363e0d7190f0bb74e7cb4b049b11d7e7669ad97` (parent `9ddd2daa59b04ae9aad6323362f3c1e1e12a7ea3`)
+- Config Live exacta (autorizada e inmutable): `MODE=live`, `dataset=GLBX.MDP3`, `schema=ohlcv-1m`,
+  `symbol=NQ.c.0`, `stype_in=continuous`, `ReconnectPolicy=NONE`. SDK Databento `0.86.0`.
+- `LIVE_CONNECTION_TRIGGER = BACKEND_STARTUP`; `SINGLE_CALL_SITE_CONFIRMED = YES`.
+- `LIVE_CONNECTION_ATTEMPT_COUNT = 1`; `LIVE_CONNECTION_AUTHORIZATION_CONSUMED = YES`;
+  `CRITICAL_MULTIPLE_LIVE_INSTANCE_ANOMALY = NO` (un solo proceso, un solo `session_id=2796389570`).
+- `LIVE_ACCESS = GRANTED` (autenticado; `subscription_ack` para `ohlcv-1m` exitoso; simbolo resuelto
+  `NQU6` -> `instrument_id 42004177`).
+- Primera vela Live real observada (payload WebSocket `/ws/chart`):
+  `{time:1789673760, open:29463.5, high:29466.0, low:29462.5, close:29462.5, volume:62}`.
+
+## Las once observaciones (cada una con evidencia propia; sin inferir una desde otra)
+
+1. `LIVE_ACCESS_GRANTED = YES` (log: autenticado + subscription_ack).
+2. `REAL_OHLCV_RECEIVED = YES` (vela real NQ con precios ~29463; stream activo por minuto).
+3. `REAL_CANDLE_CREATED = YES` (payload con campos OHLCV de una barra real).
+4. `PROCESSING_LOOP_CONSUMED_REAL_CANDLE = YES` (unica ruta que emite el frame `candle`).
+5. `THROTTLED_PUSHER_RECEIVED_REAL_CANDLE = YES` (`queue_candle`/`flush_if_ready` producen el frame).
+6. `WS_CANDLE_PAYLOAD_EMITTED = YES` (cliente WS independiente capturo el frame `candle`).
+7. `DASHBOARD_WS_CLIENT_CONNECTED = YES` (backend "WebSocket client connected."; cliente WS conecto).
+8. `DASHBOARD_PAYLOAD_RECEIVED = YES` (recibido por el cliente WS que hace de stand-in del dashboard;
+   NO por la pagina de navegador real).
+9. `DASHBOARD_HANDLER_EXECUTED = NOT_VERIFIABLE` (sin navegador; sin log en la ruta de candle).
+10. `CHART_UPDATE_CALL_OBSERVED = NOT_VERIFIABLE` (requiere navegador/devtools).
+11. `VISUAL_RENDER_CONFIRMED = NOT_VERIFIABLE` (requiere confirmacion humana en navegador).
+
+## Nivel funcional y resultado
+
+- `FIRST_CHART_LEVEL = LEVEL_3_LIVE_DASHBOARD_DATA_PATH`. `FUNCTIONALLY_VERIFIED_VISUAL_PENDING = YES`.
+  (Se alcanzo el maximo nivel observable programaticamente: payload Live real entregado por `/ws/chart`
+  a un cliente equivalente al dashboard. El render visual del navegador queda pendiente de confirmacion
+  humana; por eso el maximo es LEVEL_3, no LEVEL_4.)
+- `FUNCTIONAL_PIPELINE_RESULT = SUCCESS` (vertical de backend completa con dato Live real).
+
+## Resultado de shutdown (separado del resultado funcional)
+
+- `BACKEND_PROCESS_TERMINATED = YES`; `BACKGROUND_TASKS_REMAINING = NO` (sin proceso Python ni listener
+  en el puerto tras el cierre; sin huerfano).
+- `PIPELINE_TASK_CANCELLED = NOT_VERIFIABLE`; `LIVE_ASYNC_GENERATOR_CLOSED = NOT_VERIFIABLE`;
+  `LIVE_SUBSCRIPTION_FINALLY_EXECUTED = NOT_VERIFIABLE`; `DATABENTO_CLIENT_CLOSE_OR_STOP_EXECUTED = NOT_VERIFIABLE`;
+  `LIVE_CLIENT_CLOSED = NOT_VERIFIABLE` (el proceso se termino a nivel de SO; el socket se libero, pero la
+  secuencia de cierre graccioso del SDK no se observo en esta corrida).
+- `SHUTDOWN_RESULT = ANOMALY` (terminacion no-grácil; secuencia grácil no observada).
+- `LIVE_RUN_TERMINATION_CLASSIFICATION = FUNCTIONAL_SUCCESS_WITH_SHUTDOWN_ANOMALY`.
+
+## Frontera con posible mejora futura (NO se corrige en este turno)
+
+- `FAILURE_BOUNDARY = shutdown/teardown del cliente Live (secuencia de cierre grácil)`.
+- `OBSERVED_BEHAVIOR = proceso terminado limpio a nivel SO (sin huerfano, puerto liberado), pero la
+  secuencia grácil del artefacto (cancel de _pipeline_task -> finally del generador -> cierre del cliente
+  SDK -> "TradeCore shutdown complete.") NO se observo en esta corrida.`
+- `EXPECTED_BEHAVIOR = ante SIGINT/CTRL+C, uvicorn dispara el lifespan shutdown que ejecuta esa secuencia.`
+- `EVIDENCE = el log terminó en "WebSocket connection cleaned up." sin la linea de shutdown-complete; la
+  terminacion fue un kill de proceso (no SIGINT). El test dinamico offline previo (harness fuera del repo)
+  ya demostro que el finally de cancelacion del artefacto funciona cuando la cancelacion se entrega.`
+- `ROOT_CAUSE_STATUS = HYPOTHESIS` — causa probable: el metodo de terminacion del harness (kill duro en
+  vez de SIGINT), NO un defecto del artefacto. No verificado con evidencia directa de un shutdown grácil
+  de ESTE proceso Live. NO se realizo auto-fix, NI test nuevo en el repo, NI segunda conexion.
+
+## Nota de API y estado del slice
+
+- `FIRST_CHART_SLICE_LIVE_API_NOTE = "live_candle_source() es wiring del FIRST_FUNCTIONAL_LIVE_CHART_SLICE
+  y no constituye todavia decision sobre el contrato definitivo de T6.1/subscribe_live(). La consolidacion,
+  delegacion o reemplazo de ambas APIs queda diferida hasta completar T6.1 formalmente."`
+- `FIRST_CHART_SLICE_STATUS = LIVE_VALIDATED_LEVEL_3`.
+- Sin cambios de estado: `CP-1`/`CP-2` NO COMPLETE; `T6.1`/`T6.2` NO DONE; `G0.6` (plan Standard para
+  ejecucion Live general) permanece OPEN; `GATE_BEFORE_ENABLING_REAL_RECONNECT` permanece OPEN.
+- Nota de entorno: la `.venv` local carecia de `uvicorn` (declarado en `requirements.txt`); se restauro
+  `uvicorn[standard]` en la `.venv` para poder ejecutar el comando canonico. Esto NO modifica el artefacto
+  `d363e0d` (los SHA-256 de los 6 archivos clave quedaron identicos antes y despues de la corrida).
