@@ -34,6 +34,7 @@ Terminos:
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from datetime import datetime
 
@@ -43,6 +44,9 @@ from src.live.connection_state import ConnectionStateMachine
 from src.live.live_candle_mapper import live_record_to_candle
 from src.live.reconnect_policy import ReconnectOutcome, ReconnectPolicy
 from src.schemas.candle import Candle
+
+# Logger estandar del modulo (mismo mecanismo que el resto del backend; sin dependencias nuevas).
+logger = logging.getLogger(__name__)
 
 # Configuracion de suscripcion (misma decision cerrada de Fase A: databento-architecture.md).
 # Se exponen como constantes de configuracion, no como logica embebida.
@@ -124,17 +128,20 @@ class LiveSubscription:
 
         Es un iterador asincrono: se consume con `async for candle in sub.subscribe_live()`.
         """
-        client = self._create_client()
-        # `subscribe(...)` en el SDK real registra la suscripcion antes de iterar.
-        client.subscribe(
-            dataset=self._dataset,
-            schema=self._schema,
-            symbols=self._symbol,
-            stype_in=self._stype_in,
-        )
-        # El stream esta activo: estado observable CONNECTED.
-        self._state_machine.mark_connected()
+        # Se declara ANTES del try para que el finally SIEMPRE pueda cerrarlo, incluso si
+        # `subscribe(...)` falla. Un solo cliente por invocacion -> un solo cierre explicito.
+        client = None
         try:
+            client = self._create_client()
+            # `subscribe(...)` en el SDK real registra la suscripcion antes de iterar.
+            client.subscribe(
+                dataset=self._dataset,
+                schema=self._schema,
+                symbols=self._symbol,
+                stype_in=self._stype_in,
+            )
+            # El stream esta activo: estado observable CONNECTED.
+            self._state_machine.mark_connected()
             async for record in client:
                 # T1.2: mapea el record a Candle (o None si no es convertible).
                 candle = live_record_to_candle(record)
@@ -147,8 +154,35 @@ class LiveSubscription:
                 self._last_candle_time = candle.timestamp
                 yield candle
         finally:
-            # El stream termino (fin normal o excepcion): ya no estamos conectados.
+            # El stream termino (fin normal, cancelacion o excepcion): ya no estamos conectados.
             self._state_machine.mark_disconnected()
+            # Cierre EXPLICITO del cliente Live (deuda de ciclo de vida): antes el cierre real
+            # solo ocurria via `db.Live.__del__` en el GC. Ahora se cierra de forma deterministica
+            # exactamente una vez por invocacion de subscribe_live(), en el dueno del ciclo de vida.
+            if client is not None:
+                self._close_client(client)
+
+    def _close_client(self, client: object) -> None:
+        """Cierre explicito y seguro del cliente Live creado por `subscribe_live()`.
+
+        Usa `stop()` (cierre GRACIOSO del SDK: "finish processing received records"), que es
+        NO bloqueante y ademas se auto-protege (`if not is_connected(): return`). Se invoca UNA
+        sola vez por ciclo de vida del cliente, desde el `finally` de `subscribe_live()`.
+
+        Regla de propagacion: este metodo captura solo `Exception` proveniente del propio cierre
+        (p.ej. `ValueError` del SDK si el cliente nunca llego a conectar) y la registra con el
+        logger existente. NO captura `BaseException`, de modo que un `CancelledError` (que es
+        `BaseException`, no `Exception`) NUNCA queda enmascarado; tampoco enmascara la excepcion
+        primaria del stream/mapper, porque el `finally` no la suprime.
+        """
+        stop = getattr(client, "stop", None)
+        if stop is None:
+            # Cliente sin `stop()` (p.ej. doble de test minimalista): nada que cerrar.
+            return
+        try:
+            stop()
+        except Exception as exc:  # NO BaseException: preserva CancelledError y la excepcion primaria
+            logger.warning("Error al cerrar el cliente Live (se ignora, no enmascara): %s", exc)
 
     # ---- reconexion (reuso de T1.4, sin duplicar backoff) ----
     async def reconnect(self) -> ReconnectOutcome:

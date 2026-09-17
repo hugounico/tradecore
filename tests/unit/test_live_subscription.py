@@ -212,3 +212,146 @@ async def test_reconnect_without_policy_raises():
     sub = _make_sub()
     with pytest.raises(RuntimeError):
         await sub.reconnect()
+
+
+# =====================================================================================
+# Tests permanentes del CICLO DE VIDA del cliente Live (cierre explicito).
+# Verifican que cada cliente creado por subscribe_live() recibe exactamente UN cierre
+# explicito (`stop()`) al terminar la invocacion, por cualquier via (normal, cancelacion,
+# excepcion del stream/mapper), sin enmascarar CancelledError ni la excepcion primaria.
+# Cliente Databento MOCKEADO; sin red.
+# =====================================================================================
+
+import asyncio  # noqa: E402  (import local a la seccion de tests de ciclo de vida)
+
+
+def _make_live_instance(aiter_fn, *, stop=None):
+    """Instancia mock de db.Live con subscribe() sincrono, __aiter__ dado y stop() observable."""
+    inst = MagicMock()
+    inst.subscribe = MagicMock()
+    inst.__aiter__ = aiter_fn
+    inst.stop = stop if stop is not None else MagicMock(name="stop")
+    return inst
+
+
+# --- CASE A: terminacion normal del stream -> stop() exactamente una vez ---
+
+async def test_lifecycle_case_a_normal_termination_closes_once():
+    sub = _make_sub()
+    record_1 = _make_mock_record(TS_1, PRICE_OPEN, PRICE_HIGH, PRICE_LOW, PRICE_CLOSE, VOLUME)
+    cm, aiter_fn = _patch_live([record_1])
+    with cm as mock_live_class:
+        inst = _make_live_instance(aiter_fn)
+        mock_live_class.return_value = inst
+
+        async for _ in sub.subscribe_live():
+            pass
+
+    assert inst.stop.call_count == 1  # cierre explicito exactamente una vez
+    assert sub.is_connected is False
+
+
+# --- CASE B: cancelacion asyncio -> finally corre, desconectado, stop() una vez, CancelledError preservado ---
+
+async def test_lifecycle_case_b_cancellation_closes_once_and_preserves_cancel():
+    sub = _make_sub()
+
+    started = asyncio.Event()
+
+    async def _aiter_blocking(*args, **kwargs):
+        # Emite una vela, senala que arranco, luego se bloquea hasta ser cancelado.
+        yield _make_mock_record(TS_1, PRICE_OPEN, PRICE_HIGH, PRICE_LOW, PRICE_CLOSE, VOLUME)
+        started.set()
+        await asyncio.sleep(3600)  # se cancelara antes de completar
+        yield _make_mock_record(TS_2, PRICE_OPEN, PRICE_HIGH, PRICE_LOW, PRICE_CLOSE, VOLUME)
+
+    cm = patch("src.live.live_subscription.db.Live")
+    with cm as mock_live_class:
+        inst = _make_live_instance(_aiter_blocking)
+        mock_live_class.return_value = inst
+
+        async def _consume():
+            async for _ in sub.subscribe_live():
+                pass
+
+        task = asyncio.create_task(_consume())
+        await started.wait()
+        assert sub.is_connected is True  # conectado durante el stream
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task  # CancelledError NO enmascarado: se propaga
+
+    assert sub.is_connected is False          # finally corrio -> desconectado
+    assert inst.stop.call_count == 1          # cierre explicito exactamente una vez
+
+
+# --- CASE C: excepcion del stream -> stop() una vez, excepcion primaria observable ---
+
+async def test_lifecycle_case_c_stream_exception_closes_once_and_propagates():
+    sub = _make_sub()
+
+    class _StreamBoom(RuntimeError):
+        pass
+
+    async def _aiter_raises(*args, **kwargs):
+        yield _make_mock_record(TS_1, PRICE_OPEN, PRICE_HIGH, PRICE_LOW, PRICE_CLOSE, VOLUME)
+        raise _StreamBoom("stream failed")
+
+    cm = patch("src.live.live_subscription.db.Live")
+    with cm as mock_live_class:
+        inst = _make_live_instance(_aiter_raises)
+        mock_live_class.return_value = inst
+
+        with pytest.raises(_StreamBoom):  # excepcion primaria del stream sigue observable
+            async for _ in sub.subscribe_live():
+                pass
+
+    assert inst.stop.call_count == 1
+    assert sub.is_connected is False
+
+
+# --- CASE D: el propio cierre lanza -> el error primario NO queda enmascarado ---
+
+async def test_lifecycle_case_d_close_raises_does_not_mask_primary():
+    sub = _make_sub()
+
+    class _StreamBoom(RuntimeError):
+        pass
+
+    async def _aiter_raises(*args, **kwargs):
+        yield _make_mock_record(TS_1, PRICE_OPEN, PRICE_HIGH, PRICE_LOW, PRICE_CLOSE, VOLUME)
+        raise _StreamBoom("primary stream error")
+
+    stop_that_raises = MagicMock(name="stop", side_effect=ValueError("close failed"))
+
+    cm = patch("src.live.live_subscription.db.Live")
+    with cm as mock_live_class:
+        inst = _make_live_instance(_aiter_raises, stop=stop_that_raises)
+        mock_live_class.return_value = inst
+
+        # La excepcion PRIMARIA (_StreamBoom) debe propagarse, NO el ValueError del cierre.
+        with pytest.raises(_StreamBoom):
+            async for _ in sub.subscribe_live():
+                pass
+
+    assert stop_that_raises.call_count == 1   # se intento cerrar
+    assert sub.is_connected is False
+
+
+# --- CASE E: camino normal -> no hay segundo cierre duplicado para el mismo cliente ---
+
+async def test_lifecycle_case_e_no_double_close_on_normal_path():
+    sub = _make_sub()
+    records = [
+        _make_mock_record(TS_1, PRICE_OPEN, PRICE_HIGH, PRICE_LOW, PRICE_CLOSE, VOLUME),
+        _make_mock_record(TS_2, PRICE_OPEN, PRICE_HIGH, PRICE_LOW, PRICE_CLOSE, 1600),
+    ]
+    cm, aiter_fn = _patch_live(records)
+    with cm as mock_live_class:
+        inst = _make_live_instance(aiter_fn)
+        mock_live_class.return_value = inst
+
+        async for _ in sub.subscribe_live():
+            pass
+
+    assert inst.stop.call_count == 1  # exactamente una vez, sin duplicado
