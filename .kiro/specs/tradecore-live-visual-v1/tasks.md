@@ -335,6 +335,44 @@ Clasificacion: `BLOCKS_IMPLEMENTATION` / `BLOCKS_PRODUCTION` / `BLOCKS_TRADER_RE
     Para avanzar posteriormente se requerira: (1) revisar este diff; (2) aprobar el diseño; (3) crear un
     commit documental separado; (4) dar autorizacion explicita de ejecucion en un turno posterior. Este
     turno NO autoriza RUN6. ORIGIN = APPROVED_RESTRICTION. No modifica el campo Gate de T1.5.
+  - **G0.6-EXC-3 — FINAL STATUS: USED (RUN6 ejecutada; actualizacion aditiva, el texto historico se conserva).**
+    `G0_6_EXC_3_FINAL_STATUS = USED`. La excepcion fue consumida durante `RUN6_RUN_ID = RUN6_20260917T133422Z`,
+    ejecucion Live real con el harness re-fijado `eoi_probe_run5.py`
+    (SHA-256 `87be3130df9e1f757fb8d62c96f918293b2be4191f69bab6702993b7d1d73c83`), via su entrypoint `--live`
+    (`run_live()`), con el entorno recuperado `.venv` (Python 3.12.13, databento 0.86.0). `LIVE_GLBX_MDP3_ACCESS = GRANTED`;
+    primer record experimental = OHLCV (seq 2) recibido Y persistido. G0.6 permanece `OPEN` (esta excepcion no lo levanta).
+    Correccion al registro: `RUN5_LIVE_EXECUTION_COUNT_VERIFIED_BEFORE_RUN6 = 1` (solo RUN5-B uso este harness;
+    RUN4 uso `eoi_probe_run4.py`, un archivo distinto). Cualquier wording previo que sugiera "2 ejecuciones Live"
+    con el mismo harness queda corregido a "1 antes de RUN6".
+
+    Terminacion RUN6 (por evidencia/milestones, no por tiempo transcurrido): `RUN6_CAPTURE_WINDOW_COMPLETED = YES`;
+    `RUN6_TEARDOWN_COMPLETED = YES`; `RUN6_WATCHDOG_TRIGGERED = NO`;
+    `RUN6_TERMINATION_CLASSIFICATION = CLEAN_CAPTURE_AND_TEARDOWN` (summary `milestone=FINAL`,
+    `operational_result=CAPTURE_WINDOW_COMPLETED`, `capture_duration_seconds=600.063`, watchdog no disparado).
+    NO recurrio la anomalia de cierre observada en RUN4/RUN5-B.
+
+    Evidencia empirica RUN6 (todos los registros con atribucion VERIFIED): raw = 1 subscription_ack + 11 OHLCV +
+    11 EOI + 0 other_system + 0 errors; seq 1-23 monotonico, sin duplicados. Asociaciones: `RUN6_UNAMBIGUOUS = 11`,
+    `RUN6_AMBIGUOUS = 0`, `RUN6_CONTRADICTORY = 0`. En las 11, `EOI.ts_event == OHLCV.ts_event`
+    (`TS_EVENT_DELTA = 0`), un unico OHLCV y un unico EOI por ventana de 1 minuto (no asociacion por mera
+    adyacencia). No se usa `EOI.instrument_id = 0` para inferir scope.
+
+    Reconciliacion RUN5-B (evidencia directa de artefactos): `RUN5B_RAW_COUNTS = OHLCV 3 / EOI 3`;
+    `RUN5B_EVALUABLE_ASSOCIATIONS = 3`; `RUN5B_UNAMBIGUOUS_ASSOCIATIONS = 3` (3 pares same-ts_event, delta 0).
+    El cierre metodologico previo registro 2 (conteo conservador); la evidencia directa muestra 3. La conclusion de
+    suficiencia no depende de este ajuste (RUN6 aporta 11 inequivocas por si solo). No se reabre la investigacion RUN5-B.
+
+    Suficiencia: `CUMULATIVE_UNAMBIGUOUS >= 15` (RUN4 2 + RUN5-B 2..3 + RUN6 11), `CUMULATIVE_AMBIGUOUS = 0`,
+    `CUMULATIVE_CONTRADICTORY = 0`, patron de timestamp consistente en RUN4/RUN5-B/RUN6.
+    `EMPIRICAL_EVIDENCE_STATUS = SUFFICIENT_FOR_PROBE_CONFIGURATION`.
+    `LIVE_BAR_FINALITY_CLASSIFICATION = EMPIRICALLY_VERIFIED_FOR_PROBE_CONFIGURATION` (PROPUESTA para revision).
+    `DOCUMENTED_PROTOCOL_GUARANTEE = NO`. No se infiere scope per-subscription, per-instrument, otros
+    schemas/datasets, ni versiones futuras del SDK.
+
+    Recomendacion (propuesta, no cierre unilateral): `EOI_RESEARCH_STATUS = CLOSED_FOR_CURRENT_PRODUCT_NEED`
+    — evidencia suficiente para continuar TradeCore sin garantia universal del protocolo; reabrible ante una
+    contradiccion material nueva o una necesidad funcional distinta. ORIGIN = APPROVED_RESTRICTION.
+    No modifica el campo Gate de T1.5.
 - **G0.7 — Candle timestamp semantics.** Por que: define `signal_market_timestamp` canonico y alineacion
   TradingView. Alimentado por T0.1. Bloquea: T3.5 (timestamps de Capa 1), T7 time tests, W9. Resolver
   antes de W3. BLOCKS_IMPLEMENTATION.
@@ -342,6 +380,13 @@ Clasificacion: `BLOCKS_IMPLEMENTATION` / `BLOCKS_PRODUCTION` / `BLOCKS_TRADER_RE
   (ts_event = apertura del intervalo, evidencia oficial Databento OHLCV data dictionary); LIVE_BAR_FINALITY
   = OPEN (finalidad de entrega Live no verificada; ver Design B.14 [SEGURO — LIVE BAR FINALITY REQUIRES
   VERIFICATION]). No cerrar completamente mientras englobe ambas cuestiones.
+  ACTUALIZACION (post-RUN6, PROPUESTA para revision de Hugo): LIVE_BAR_FINALITY cuenta ahora con evidencia
+  empirica del probe (RUN4 + RUN5-B + RUN6, >=15 asociaciones inequivocas acumuladas, `EOI.ts_event ==
+  OHLCV.ts_event` con delta 0, sin contradicciones). Distincion B.14 obligatoria:
+  `EMPIRICAL_RESULT = EMPIRICALLY_VERIFIED_FOR_PROBE_CONFIGURATION` (GLBX.MDP3 / ohlcv-1m / NQ.c.0 / continuous,
+  SDK 0.86.0) vs `DOCUMENTED_PROTOCOL_GUARANTEE = NO`. No se declara scope per-subscription/per-instrument ni
+  garantia para otros schemas/datasets/versiones. G0.7 no se cierra unilateralmente aqui; queda como propuesta
+  para que Hugo decida el estado final de B.14/LIVE_BAR_FINALITY.
 - **G0.8 — `strategy_version` (literal/mecanismo, p.ej. `SMA_9_21_v1`).** Por que: campo obligatorio de
   Capa 1. Bloquea: T3.4. Resolver antes de W3. BLOCKS_IMPLEMENTATION.
 - **G0.9 — PostgreSQL deployment (RDS vs contenedor en ECS) + version.** Por que: infraestructura de
