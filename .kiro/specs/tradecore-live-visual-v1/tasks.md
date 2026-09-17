@@ -255,8 +255,18 @@ Clasificacion: `BLOCKS_IMPLEMENTATION` / `BLOCKS_PRODUCTION` / `BLOCKS_TRADER_RE
     conceptual/arquitectonico, pero NO como gate formal en el bloque de T1.5. Esta propuesta NO fusiona
     G0.6 con G0.7, NO cierra G0.7 y NO cambia `LIVE_BAR_FINALITY_CLASSIFICATION = CASE_B`.
 
-    Harness propuesto: `eoi_probe_run5d.py`
-    (SHA-256 `3adb1266a93517ea04b9eba062068ce1e7982aa576a278f8d1d31ce0dffee360`).
+    Harness (RE-FIJADO): `eoi_probe_run5.py`
+    (SHA-256 `87be3130df9e1f757fb8d62c96f918293b2be4191f69bab6702993b7d1d73c83`).
+    Nota de re-fijado: la referencia anterior era `eoi_probe_run5d.py`
+    (`3adb1266a93517ea04b9eba062068ce1e7982aa576a278f8d1d31ce0dffee360`), variante observacional que
+    NO tiene entrypoint Live propio y requiere un composition root externo cuya validacion real bajo
+    trafico Live no puede lograrse offline (los self-tests, por diseno de seguridad, no pueden abrir una
+    conexion Live real). Se re-fija al harness `eoi_probe_run5.py`, el unico con ejecucion Live real ya
+    demostrada (`RUN5_LIVE_EXECUTION_COUNT_VERIFIED = 1`: RUN5-B via `run5b_launch.py`, GRANTED, OHLCV/EOI
+    recibidos y persistidos). EXC-3 nunca fue consumida con el harness incorrecto: este re-fijado NO revoca
+    ninguna ejecucion ya realizada. Se realizo forense offline (Fase A) de run5d/run5b_launch/run5 para una
+    decision futura separada sobre preservar la instrumentacion D1-D5, sin que ello condicione este
+    re-fijado.
     `FUNCTIONAL_CONTROL_CHANGE_COUNT = 0`; `HARNESS_OFFLINE_VALIDATED = YES`;
     `HARNESS_READY_FOR_AUTHORIZATION_REVIEW = YES` (esto NO equivale a autorizacion Live). Antes de
     cualquier FUTURA ejecucion autorizada debera RECALCULARSE el SHA-256 del archivo en disco; si no
