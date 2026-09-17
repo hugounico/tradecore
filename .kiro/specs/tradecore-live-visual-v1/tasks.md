@@ -373,6 +373,31 @@ Clasificacion: `BLOCKS_IMPLEMENTATION` / `BLOCKS_PRODUCTION` / `BLOCKS_TRADER_RE
     — evidencia suficiente para continuar TradeCore sin garantia universal del protocolo; reabrible ante una
     contradiccion material nueva o una necesidad funcional distinta. ORIGIN = APPROVED_RESTRICTION.
     No modifica el campo Gate de T1.5.
+
+  - **G0.6-EXC-3 / EOI — APPROVED (revision de Hugo; actualizacion aditiva, no reescribe lo anterior).**
+    Hugo reviso y aprobo el cierre empirico de RUN6/EXC-3. Las clasificaciones antes marcadas PROPUESTA pasan a
+    APPROVED:
+    `EMPIRICAL_EVIDENCE_STATUS = SUFFICIENT_FOR_PROBE_CONFIGURATION` (APPROVED);
+    `LIVE_BAR_FINALITY_CLASSIFICATION = EMPIRICALLY_VERIFIED_FOR_PROBE_CONFIGURATION` (APPROVED);
+    `EOI_RESEARCH_STATUS = CLOSED_FOR_CURRENT_PRODUCT_NEED` (APPROVED);
+    `G0_6_EXC_3_FINAL_STATUS = USED` (APPROVED).
+    Se preserva explicitamente `DOCUMENTED_PROTOCOL_GUARANTEE = NO`: la clasificacion empirica NUNCA constituye
+    PROTOCOL_GUARANTEE ni scope no demostrado (per-instrument, per-subscription, otros schemas/datasets/versiones
+    del SDK). No se autorizan RUN7/RUN8 solo para aumentar la muestra EOI.
+
+    Correccion ADITIVA del baseline RUN5-B (no borra el valor historico): `RUN5B_UNAMBIGUOUS` fue documentado
+    originalmente como 2. La re-verificacion forense contra el log raw identifico 3 asociaciones inequivocas
+    segun la misma metodologia aprobada (3 pares, mismo ts_event, delta 0, sin competidor). Valor corregido para
+    calculos posteriores = 3. Totales aprobados: `RUN4 = 2`; `RUN5B_CORRECTED = 3`; `RUN6 = 11`;
+    `CUMULATIVE_UNAMBIGUOUS_TOTAL = 16`; `AMBIGUOUS = 0`; `CONTRADICTORY = 0`. Esto NO cambia ninguna conclusion
+    ya aprobada (con 2 o 3, el acumulado supera el minimo de 5).
+
+    Correccion de etiqueta T1.5 (precision, no rehace T1.5): `T1_5_TRUE_PREIMPLEMENTATION_RED_BASELINE = NOT_CAPTURED`
+    (la implementacion y los tests ya existian cuando se corrio la suite llamada "red baseline");
+    `T1_5_INITIAL_INTEGRATION_BASELINE = 349 tests / 13 failures`;
+    `T1_5_FINAL_VERIFICATION = 356 tests / 12 known connector failures / 0 new`. T1.5 sigue aprobado
+    funcionalmente; esta nota solo corrige la etiqueta.
+    ORIGIN = APPROVED_RESTRICTION. No modifica el campo Gate de T1.5.
 - **G0.7 — Candle timestamp semantics.** Por que: define `signal_market_timestamp` canonico y alineacion
   TradingView. Alimentado por T0.1. Bloquea: T3.5 (timestamps de Capa 1), T7 time tests, W9. Resolver
   antes de W3. BLOCKS_IMPLEMENTATION.
