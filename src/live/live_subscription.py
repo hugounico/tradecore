@@ -38,7 +38,10 @@ import logging
 from collections.abc import AsyncIterator
 from datetime import datetime
 
+import asyncio
+
 import databento as db  # cliente oficial; se MOCKEA en tests (patch de este simbolo)
+from databento_dbn import SystemCode, SystemMsg
 
 from src.live.connection_state import ConnectionStateMachine
 from src.live.live_candle_mapper import live_record_to_candle
@@ -79,6 +82,7 @@ class LiveSubscription:
         stype_in: str = STYPE_IN,
         last_candle_time: datetime | None = None,
         reconnect_policy: ReconnectPolicy | None = None,
+        replay_start: datetime | None = None,
     ) -> None:
         # Credencial y parametros de suscripcion (no se imprime ni persiste la API key).
         self._api_key = api_key
@@ -93,6 +97,14 @@ class LiveSubscription:
         # Policy de reconexion opcional (reuso de T1.4). No se usa en el flujo feliz;
         # queda disponible para gobernar reconexion sin duplicar backoff.
         self._reconnect_policy = reconnect_policy
+        # LIVE_REPLAY_BOOTSTRAP_SLICE: inicio de replay intradia opcional. Si es None se
+        # suscribe sin `start` (comportamiento previo, retrocompatible). Si es un datetime,
+        # se pasa a `client.subscribe(start=...)` y el gateway reproduce desde ese punto.
+        self._replay_start: datetime | None = replay_start
+        # Evento que se activa al observar SystemCode.REPLAY_COMPLETED (el replay alcanzo el
+        # presente). Es la UNICA autoridad de frontera REPLAY->LIVE. Se expone por separado del
+        # flujo de Candle para NO contaminar el contrato CandleSource (que solo entrega Candle).
+        self._replay_completed_event = asyncio.Event()
 
     # ---- estado observable ----
     @property
@@ -104,6 +116,20 @@ class LiveSubscription:
     def last_candle_time(self) -> datetime | None:
         """Timestamp (apertura) de la ultima vela emitida/conocida, o None."""
         return self._last_candle_time
+
+    @property
+    def replay_completed_event(self) -> asyncio.Event:
+        """`asyncio.Event` que se activa al recibir SystemCode.REPLAY_COMPLETED.
+
+        Mecanismo separado del flujo de Candle: permite que el consumidor espere/observe la
+        frontera REPLAY->LIVE sin que `subscribe_live()` entregue nada distinto de `Candle`.
+        """
+        return self._replay_completed_event
+
+    @property
+    def is_replay_complete(self) -> bool:
+        """True una vez observado SystemCode.REPLAY_COMPLETED (el replay alcanzo el presente)."""
+        return self._replay_completed_event.is_set()
 
     # ---- creacion del cliente (aislada para poder mockearse en tests) ----
     def _create_client(self) -> object:
@@ -134,15 +160,24 @@ class LiveSubscription:
         try:
             client = self._create_client()
             # `subscribe(...)` en el SDK real registra la suscripcion antes de iterar.
+            # LIVE_REPLAY_BOOTSTRAP_SLICE: si hay `replay_start`, se pasa como `start=` para pedir
+            # replay intradia; si es None se omite (start=None), retrocompatible con el flujo previo.
             client.subscribe(
                 dataset=self._dataset,
                 schema=self._schema,
                 symbols=self._symbol,
                 stype_in=self._stype_in,
+                start=self._replay_start,
             )
             # El stream esta activo: estado observable CONNECTED.
             self._state_machine.mark_connected()
             async for record in client:
+                # LIVE_REPLAY_BOOTSTRAP_SLICE: detectar la frontera REPLAY->LIVE ANTES del mapper.
+                # SystemCode.REPLAY_COMPLETED es la UNICA autoridad de frontera. Es un SystemMsg
+                # (no un Candle): se marca el evento y se continua, sin emitirlo por el flujo Candle.
+                if isinstance(record, SystemMsg) and record.code == SystemCode.REPLAY_COMPLETED:
+                    self._replay_completed_event.set()
+                    continue
                 # T1.2: mapea el record a Candle (o None si no es convertible).
                 candle = live_record_to_candle(record)
                 if candle is None:

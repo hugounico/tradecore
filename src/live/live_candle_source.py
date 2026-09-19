@@ -71,6 +71,20 @@ class LiveCandleSource:
         return self._subscription.is_connected
 
     @property
+    def is_replay_complete(self) -> bool:
+        """True una vez que la `LiveSubscription` observo SystemCode.REPLAY_COMPLETED.
+
+        LIVE_REPLAY_BOOTSTRAP_SLICE: reexpone la frontera REPLAY->LIVE desde la suscripcion, sin
+        cambiar el contrato `CandleSource` (que solo entrega `Candle` via `replay()`).
+        """
+        return self._subscription.is_replay_complete
+
+    @property
+    def replay_completed_event(self):
+        """`asyncio.Event` de la suscripcion que se activa al recibir REPLAY_COMPLETED."""
+        return self._subscription.replay_completed_event
+
+    @property
     def subscription(self) -> LiveSubscription:
         """Acceso a la `LiveSubscription` envuelta (p.ej. para `last_candle_time`/reconnect)."""
         return self._subscription

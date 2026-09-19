@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -26,6 +27,19 @@ from src.pipeline.simulation_replay import SimulationReplay
 from src.schemas.candle import Candle
 
 logger = logging.getLogger(__name__)
+
+# --- LIVE_REPLAY_BOOTSTRAP_SLICE constants ---
+# Ventana de replay intradia solicitada al arrancar en MODE=live. Debe quedar dentro del limite
+# del SDK (replay "within 24 hours"). 90 min da margen sobre el minimo matematico de warm-up de
+# senal (~22 velas de 1 min) sin correlacion lineal (una ventana puede contener menos velas que
+# minutos si hay minutos sin volumen). Ventana relativamente corta para reducir (NO eliminar) la
+# exposicion a un rollover del contrato continuo durante el replay.
+LIVE_REPLAY_LOOKBACK_MINUTES = 90
+
+# Timeout de espera de SystemCode.REPLAY_COMPLETED durante el arranque. En la prueba real llego en
+# ~0.4s; 30s da margen amplio y acotado. Si no llega dentro del timeout, el arranque DEGRADA CON
+# GRACIA: continua sin bloquear (con el contexto que haya llegado), sin reconnect ni 2a conexion.
+REPLAY_COMPLETION_TIMEOUT_SECONDS = 30.0
 
 # Module-level state shared across the app
 _settings: Settings | None = None
@@ -110,8 +124,16 @@ async def _flush_loop() -> None:
             await asyncio.sleep(0.1)
 
 
-async def _processing_loop() -> None:
-    """Receive candles from SimulationReplay and process through the pipeline."""
+async def _processing_loop(suppress_signals=None) -> None:
+    """Receive candles from a CandleSource and process through the pipeline.
+
+    `suppress_signals` (opcional, LIVE_REPLAY_BOOTSTRAP_SLICE): predicado sin argumentos que
+    devuelve True mientras las senales NO deben emitirse (fase de replay del bootstrap). El motor
+    SIEMPRE se evalua (para calentar su estado SMA), pero la Signal devuelta NO se encola mientras
+    el predicado sea True. Por defecto es None => nunca suprime => comportamiento de simulation
+    intacto. La frontera REPLAY->LIVE la decide EXCLUSIVAMENTE quien construye este predicado
+    (en el slice: SystemCode.REPLAY_COMPLETED via la fuente Live), NO un conteo de velas aqui.
+    """
     global _replay, _buffer, _engine, _pusher, _settings
 
     if _replay is None or _buffer is None or _engine is None or _pusher is None:
@@ -143,10 +165,17 @@ async def _processing_loop() -> None:
                 time_val = int(candle.timestamp.timestamp())
                 await _pusher.queue_sma_update(time_val, round(sma_fast, 2), round(sma_slow, 2))
 
-            # Queue signal if crossover detected
+            # Queue signal if crossover detected — but suppress emission while a replay bootstrap
+            # is in progress (the engine state above was still advanced; only emission is gated).
             if signal is not None:
-                await _pusher.queue_signal(signal)
-                logger.info("Signal generated: %s at %.2f", signal.type.value, signal.price)
+                if suppress_signals is not None and suppress_signals():
+                    logger.debug(
+                        "Signal suppressed during replay bootstrap: %s at %.2f",
+                        signal.type.value, signal.price,
+                    )
+                else:
+                    await _pusher.queue_signal(signal)
+                    logger.info("Signal generated: %s at %.2f", signal.type.value, signal.price)
 
         except Exception as exc:
             logger.error("Processing loop error for candle %s: %s", candle.timestamp, exc)
@@ -217,9 +246,10 @@ async def lifespan(app: FastAPI):
             logger.warning("No historical candles loaded. Simulation will not run.")
 
     elif _settings.mode == "live":
-        # FIRST_FUNCTIONAL_LIVE_CHART_SLICE (ver tasks.md): rama Live MINIMA.
-        # NO completa T6.2 (sin maquina de estados W2, sin warm-up/persistencia/persist-before-publish,
-        # sin T2.10, sin gate compuesto — ver T6_2_REMAINING_AFTER_FIRST_CHART_SLICE).
+        # LIVE_REPLAY_BOOTSTRAP_SLICE (ver tasks.md): rama Live con bootstrap de contexto por
+        # intraday replay. Pide replay desde now-LOOKBACK, alimenta buffer+engine SIN emitir
+        # senales de replay, y transiciona a Live cuando llega SystemCode.REPLAY_COMPLETED (unica
+        # autoridad de frontera). NO completa T6.2 (sin W2/warm-up formal/persistencia/gate compuesto).
         # Reutiliza el MISMO _processing_loop que Simulation: la fuente Live cumple CandleSource.
         connector = DabentoConnector(
             api_key=_settings.databento_api_key,
@@ -227,18 +257,45 @@ async def lifespan(app: FastAPI):
             symbol=_settings.databento_symbol,
             stype_in=_settings.databento_stype_in,
         )
-        # Fuente Live que cumple CandleSource (replay()); ReconnectPolicy=NONE (una sola conexion).
-        _replay = connector.live_candle_source()
+        # Inicio de replay: now - LOOKBACK (tz-aware UTC; el SDK convierte a ns internamente).
+        replay_start = datetime.now(timezone.utc) - timedelta(minutes=LIVE_REPLAY_LOOKBACK_MINUTES)
+        # Fuente Live con replay start; ReconnectPolicy=NONE (una sola conexion).
+        _replay = connector.live_candle_source(replay_start=replay_start)
+        _live_source = _replay  # referencia para el predicado de supresion
 
-        # Arranca el MISMO pipeline processing loop que consume la simulacion.
-        _pipeline_task = asyncio.create_task(_processing_loop())
+        # Supresion de senales mientras el replay esta en curso: la Signal se descarta hasta que
+        # la fuente observe REPLAY_COMPLETED. El motor SIGUE evaluandose (se calienta su estado).
+        def _suppress_during_replay() -> bool:
+            return not _live_source.is_replay_complete
+
+        # Arranca el MISMO pipeline processing loop, con supresion de senales de replay.
+        _pipeline_task = asyncio.create_task(
+            _processing_loop(suppress_signals=_suppress_during_replay)
+        )
         logger.info(
-            "Live started (first functional slice): %s %s %s stype=%s, ReconnectPolicy=NONE.",
+            "Live started (replay bootstrap): %s %s %s stype=%s, replay_start=%s, ReconnectPolicy=NONE.",
             _settings.databento_dataset,
             "ohlcv-1m",
             _settings.databento_symbol,
             _settings.databento_stype_in,
+            replay_start.isoformat(),
         )
+
+        # Espera de la frontera REPLAY_COMPLETED durante el arranque, con degradacion con gracia:
+        # el buffer se llena con el contexto de replay antes de que el navegador conecte. Si no
+        # llega dentro del timeout, se continua igualmente (sin bloquear el arranque, sin reconnect).
+        try:
+            await asyncio.wait_for(
+                _live_source.replay_completed_event.wait(),
+                timeout=REPLAY_COMPLETION_TIMEOUT_SECONDS,
+            )
+            logger.info("Replay bootstrap completed (REPLAY_COMPLETED observed).")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Replay bootstrap did not complete within %.0fs; continuing without full "
+                "bootstrap context (graceful degradation, no reconnect).",
+                REPLAY_COMPLETION_TIMEOUT_SECONDS,
+            )
 
     yield
 

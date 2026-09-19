@@ -159,7 +159,11 @@ class DabentoConnector:
             logger.warning("Failed to convert record to Candle: %s", exc)
             return None
 
-    def live_candle_source(self, last_candle_time: datetime | None = None):
+    def live_candle_source(
+        self,
+        last_candle_time: datetime | None = None,
+        replay_start: datetime | None = None,
+    ):
         """Devuelve una fuente de velas LIVE que cumple el contrato `CandleSource`.
 
         Integracion MINIMA del slice FIRST_FUNCTIONAL_LIVE_CHART_SLICE: expone la abstraccion
@@ -177,6 +181,10 @@ class DabentoConnector:
 
         `last_candle_time` (opcional): ultima vela conocida para el dedup (p.ej. la ultima historica);
         el slice puede pasar `None` (sin warm-up completo) o el tail historico si se dispone.
+
+        `replay_start` (opcional, LIVE_REPLAY_BOOTSTRAP_SLICE): si es un datetime, la suscripcion pide
+        replay intradia desde ese punto (`subscribe(start=replay_start)`) para bootstrap de contexto;
+        si es None se suscribe sin `start` (comportamiento previo).
         """
         # Imports locales para no acoplar el import-time del connector (mismo patron que Historical).
         from src.live.live_candle_source import LiveCandleSource
@@ -189,6 +197,7 @@ class DabentoConnector:
             symbol=self._symbol,
             stype_in=self._stype_in,
             last_candle_time=last_candle_time,
+            replay_start=replay_start,
             reconnect_policy=None,  # ReconnectPolicy.NONE para el slice (sin reconexion real)
         )
         return LiveCandleSource(subscription)
