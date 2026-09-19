@@ -1417,3 +1417,101 @@ que la evidencia persistida del fixture es documental, no un log crudo. `FIXTURE
   dependencia ya declarada en `requirements.txt`); no se instalo ni desinstalo nada este turno.
 - Commit A (codigo): `LIFECYCLE_COMMIT_HASH = badd9df3b68d30034aeef7ab62d252c3d0c802b2`
   ("Etapa 1 Live: add explicit Databento client close in LiveSubscription"). Sin push.
+
+---
+
+# FIRST_FUNCTIONAL_LIVE_CHART_SLICE — ACEPTACION FINAL (2026-09-18; aditivo, no reescribe lo anterior)
+
+> Seccion aditiva y fechada. Registra el run de ACEPTACION FINAL del slice con el navegador real de
+> Hugo como UNICO cliente WebSocket. NO reescribe ni reinterpreta registros historicos previos. NO
+> marca T6.1/T6.2 DONE, NO marca CP-1/CP-2 COMPLETE. Turno 100% OFFLINE de consolidacion documental:
+> NO se modifico codigo ni tests; el unico archivo tocado es este `tasks.md`.
+
+## Run de aceptacion
+
+- `FINAL_ACCEPTANCE_RUN = FINAL_ACCEPTANCE_20260918T161059Z`
+- `HEAD_PROBADO = dc1c68f30f46a8649773bac0b82aaecaebf662df` (branch `feature/live-dashboard-demo`).
+- Config Live exacta (autorizada e inmutable): `MODE=live`, `dataset=GLBX.MDP3`, `schema=ohlcv-1m`,
+  `symbol=NQ.c.0`, `stype_in=continuous`, `ReconnectPolicy=NONE`, `DATABENTO_LIVE_CONNECTIONS_MAX=1`.
+- Metodologia: UN solo cliente WebSocket intencional = el navegador real de Hugo. SIN observador
+  headless (correccion metodologica del hallazgo forense: el `ThrottledPusher` tiene un unico slot
+  `_ws` sobreescrito por cada `set_connection()`; un observador automatico compitiendo con el navegador
+  podia quedarse sin los frames que si llegaban al navegador). Evidencia cruda en carpeta hermana fuera
+  del repo (`TradeCore_live_evidence/FINAL_ACCEPTANCE_20260918T161059Z/`), NO copiada al repo.
+
+## 5.1 Evidencia MACHINE_VERIFIED (leida por Kiro de archivos reales: backend.log, shutdown.log, orchestrator_result.json, manifest.json; checksums SHA-256 verificados intactos)
+
+- `LIVE_ACCESS_GRANTED = YES` (autenticado; `session_id=1805408778`).
+- `SUBSCRIPTION_ACK = YES` (`Subscription request 0 for ohlcv-1m data succeeded`).
+- `CONTINUOUS_SYMBOL_RESOLUTION = YES` (NQ.c.0 continuous resolvio a `NQZ6` / `instrument_id 261401`
+  durante el run).
+- `RUN_START_UTC = 2026-09-18T16:11:55.999369Z`; `STARTUP_CONFIRMED_UTC ~= 2026-09-18T16:12:02Z`;
+  `RUN_END_UTC = 2026-09-18T16:18:02.308971Z` (ventana de observacion de 360s completa).
+- `NORMAL_SHUTDOWN = YES` (`Shutting down` -> `Waiting for application shutdown` -> `Application shutdown complete`).
+- `EXPLICIT_DATABENTO_STOP = YES` (`src.live.live_subscription: Explicit Databento Live stop requested successfully`).
+- `SERVER_TERMINATED = YES` (returncode 3; `Finished server process`).
+- `PORT_RELEASED = YES`; `ORPHAN_PROCESS_COUNT = 0`.
+- `BROWSER_WS_CONNECTION_ACCEPTED = YES` (6 conexiones `WebSocket /ws/chart [accepted]` en backend.log,
+  UN cliente a la vez — cada "connected" precedido por la desconexion anterior; corresponden a las
+  recargas/reconexiones automaticas del navegador de Hugo, NO a clientes concurrentes).
+- Nota factual sobre observabilidad (establecida por lectura de codigo en el turno forense previo):
+  `SUCCESS_PATH_LOGGED_ANYWHERE_IN_CHAIN = NO` — ninguna conversion OHLCV->Candle exitosa deja rastro en
+  backend.log (solo el camino de error loguea). Por eso `REAL_OHLCV_RECEIVED` NO es observable desde
+  backend.log por si solo: `REAL_OHLCV_RECEIVED_FROM_BACKEND_LOG = NOT_OBSERVABLE`. NO se eleva a YES ni
+  se niega desde el log; la evidencia de render es testimonial de Hugo (5.2).
+
+## 5.2 Evidencia TESTIMONIAL de Hugo (transcrita; REPORTED_BY_HUMAN, NO verificada por Kiro)
+
+Kiro NO tuvo acceso a las capturas del navegador de Hugo. Lo siguiente es su testimonio transcrito:
+
+- Durante `FINAL_ACCEPTANCE_20260918T161059Z`, el dashboard cargo con badge LIVE / "Conectado" y mostro
+  una secuencia de velas japonesas con cuerpo y mecha distinguibles (no lineas planas), avanzando de
+  forma incremental en un rango aproximado de minutos entre 16:12 y 16:17 hora local (UTC-3), con
+  niveles de precio y geometrias distintos entre velas sucesivas.
+- Al terminar el backend, el dashboard paso a "Reconectando..." con errores de WebSocket en consola.
+
+Etiquetas conservadoras:
+- `VISUAL_CANDLE_RENDER = REPORTED_BY_HUMAN` (testimonio de Hugo, transcrito; no confirmado por Kiro).
+- `MULTIPLE_CONSECUTIVE_1M_CANDLES_VISUALLY_OBSERVED = YES` (reportado por Hugo; sin conteo exacto).
+- `RAW_BROWSER_OHLC_VALUES_CAPTURED = NO` (no se capturaron valores OHLC exactos del navegador).
+- `HUMAN_VISUAL_TEMPORAL_CORRELATION = STRONGLY_CONSISTENT_WITH_ACCEPTANCE_RUN` (el rango de minutos
+  reportado y el momento de "Reconectando..." son consistentes con RUN_START_UTC/RUN_END_UTC de 5.1;
+  el shutdown MACHINE_VERIFIED fue 16:18:02Z).
+
+## 5.3 Limitacion de evidencia
+
+- `RAW_WS_FRAME_CAPTURED_BY_HUMAN = NO`. El panel Network de DevTools no mostro la fila de la conexion
+  WS pese a que el navegador mantenia la conexion activa (el contador de requests seguia subiendo).
+- `DEVTOOLS_WS_FRAME_CAPTURE_LIMITATION = OBSERVED`; `CAUSE = NOT_ESTABLISHED` (no se afirma como hecho
+  tecnico la causa exacta de por que DevTools no mostro la fila; no hay evidencia independiente).
+- `FRAME_TO_VISUAL_EXACT_OHLC_CORRELATION = NOT_AVAILABLE`.
+
+## 5.4 Clasificacion del hito (sin inventar niveles nuevos)
+
+- `AUTOMATED_EVIDENCE_LEVEL = LEVEL_3_LIVE_DASHBOARD_DATA_PATH` (sin cambios; es lo que la evidencia de
+  maquina sostiene por si sola).
+- `HUMAN_VISUAL_RENDER_EVIDENCE = REPORTED_BY_HUMAN`.
+- `FIRST_CHART_SLICE_STATUS = ACCEPTED_FOR_CURRENT_PRODUCT_MILESTONE`.
+- Nota informal (NO estado formal de la Spec): "Aceptacion practica: el objetivo funcional del slice
+  —mostrar datos OHLCV Live en el dashboard— fue alcanzado segun la evidencia combinada (5.1 + 5.2),
+  aunque no constituye T6.1/T6.2 DONE ni cierre formal de CP-1/CP-2."
+
+## Regresion (reutilizada del turno anterior; MISMO HEAD, sin re-ejecutar la suite este turno)
+
+- `REGRESSION_EVIDENCE_HEAD = dc1c68f30f46a8649773bac0b82aaecaebf662df`.
+- `FULL_REGRESSION_RESULT = 375 collected / 363 passed / 12 known failures / 0 errors`.
+- `KNOWN_FAILURE_IDENTITIES_MATCH_BASELINE = YES` (los 12 spec-ahead del conector). `NEW_UNEXPECTED_FAILURES = 0`.
+- Nota metodologica (explica un episodio concreto, NO es licencia para "repetir hasta verde" en el
+  futuro): en el turno de consolidacion previo, `test_ws_chart_accepts_connections` fallo porque pytest
+  corrio con el cwd fuera del repo y `Settings()` no encontro `.env`; ejecutado desde REPO_ROOT paso. Un
+  property test (`test_buy_signal_on_upward_crossover`, Hypothesis `FailedHealthCheck`) aparecio de forma
+  transitoria en una corrida y no en otra — flakiness ya conocida de ese test, no una regresion. Dos
+  corridas reales desde REPO_ROOT sustentan el baseline 375/363/12/0.
+
+## Estado sin cambios (explicito)
+
+- `T6_1_STATUS != DONE`; `T6_2_STATUS != DONE`.
+- `CP-1 = NOT_FORMALLY_COMPLETE`; `CP-2 = NOT_FORMALLY_COMPLETE`.
+- `GATE_BEFORE_ENABLING_REAL_RECONNECT = OPEN`.
+- `T1_5_STATE_ARCHITECTURE_DEBT = PRESENT_NONBLOCKING_FOR_FIRST_CHART`.
+- NO se declara LEVEL_4 formal. NO se reinterpretan ni modifican registros historicos anteriores.
