@@ -11,11 +11,13 @@ Requirements: RF-01.1, RF-01.2, RF-01.4, RF-02.2, RF-03.1
 import asyncio
 import json
 import logging
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.api.throttled_pusher import ThrottledPusher
@@ -41,6 +43,13 @@ LIVE_REPLAY_LOOKBACK_MINUTES = 90
 # GRACIA: continua sin bloquear (con el contexto que haya llegado), sin reconnect ni 2a conexion.
 REPLAY_COMPLETION_TIMEOUT_SECONDS = 30.0
 
+# PRE_AWS_LIVE_HARDENING: plazo maximo (en segundos) que el arranque live puede pasar en la fase de
+# bootstrap (replay) SIN observar REPLAY_COMPLETED antes de que /health lo reporte como estancado
+# (503). Es un guardrail PROVISIONAL del MVP: en la prueba real el bootstrap se completo en ~1s, asi
+# que 300s da un margen amplio y no se recalibra en este cambio. El plazo SOLO aplica mientras falta
+# REPLAY_COMPLETED; una vez el replay se completa, la fase "live" nunca vuelve a mirar este deadline.
+BOOTSTRAP_STALL_DEADLINE_SECONDS = 300.0
+
 # Module-level state shared across the app
 _settings: Settings | None = None
 _buffer: CandleBuffer | None = None
@@ -49,6 +58,17 @@ _engine: SignalEngine | None = None
 _replay: SimulationReplay | None = None
 _flush_task: asyncio.Task | None = None
 _pipeline_task: asyncio.Task | None = None
+
+# PRE_AWS_LIVE_HARDENING: estado minimo para derivar la salud del pipeline live. NO es una maquina de
+# estados persistida; la fase se DERIVA en cada consulta a /health a partir de estos valores.
+# - _live_bootstrap_started_at: instante monotonico (time.monotonic()) en que se creo la tarea live.
+#   Se resetea a None al iniciar cada lifespan y se fija de nuevo justo antes de crear _pipeline_task
+#   en el bootstrap live; no se toca por request a /health.
+# - _shutdown_in_progress: True en cuanto el lifespan empieza a apagar (primero tras el yield).
+# - _stall_warning_logged: garantiza que el WARNING de bootstrap estancado se emita una sola vez.
+_live_bootstrap_started_at: float | None = None
+_shutdown_in_progress: bool = False
+_stall_warning_logged: bool = False
 
 
 def _configure_logging(level: str) -> None:
@@ -180,13 +200,28 @@ async def _processing_loop(suppress_signals=None) -> None:
         except Exception as exc:
             logger.error("Processing loop error for candle %s: %s", candle.timestamp, exc)
 
-    logger.info("Simulation replay completed.")
+    # Este mensaje describe el fin del replay de SIMULATION. En live el fin del async for significa
+    # que la fuente Live se agoto (fin inesperado del stream), NO un replay simulado terminado: por
+    # eso NO se emite aqui en live (la terminacion de la tarea la observa el supervisor + /health).
+    # getattr con default: solo el arranque real fija mode; ante un settings sin ese atributo se
+    # trata como NO-simulation (no se emite el log), sin romper llamadas directas al loop en tests.
+    if getattr(_settings, "mode", None) == "simulation":
+        logger.info("Simulation replay completed.")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: setup on startup, cleanup on shutdown."""
     global _settings, _buffer, _pusher, _engine, _replay, _flush_task, _pipeline_task
+    global _live_bootstrap_started_at, _shutdown_in_progress, _stall_warning_logged
+
+    # PRE_AWS_LIVE_HARDENING (D1): reinicia el estado de salud del pipeline al comenzar CADA lifespan,
+    # antes de cargar settings. Sin esto, un segundo arranque en el mismo proceso heredaria valores del
+    # anterior (p. ej. _shutdown_in_progress=True dejaria /health atascado en "shutting_down", o
+    # _stall_warning_logged=True suprimiria para siempre el WARNING de stall). Cada arranque parte limpio.
+    _live_bootstrap_started_at = None
+    _shutdown_in_progress = False
+    _stall_warning_logged = False
 
     # Load settings
     _settings = Settings()
@@ -268,10 +303,18 @@ async def lifespan(app: FastAPI):
         def _suppress_during_replay() -> bool:
             return not _live_source.is_replay_complete
 
+        # PRE_AWS_LIVE_HARDENING: marca de inicio del bootstrap live (monotonica), fijada UNA sola
+        # vez inmediatamente antes de crear la tarea; /health la usa para detectar bootstrap estancado.
+        _live_bootstrap_started_at = time.monotonic()
+
         # Arranca el MISMO pipeline processing loop, con supresion de senales de replay.
         _pipeline_task = asyncio.create_task(
             _processing_loop(suppress_signals=_suppress_during_replay)
         )
+        # Supervisor: la tarea corre en segundo plano y el lifespan sobrevive aunque muera; sin este
+        # callback una terminacion (excepcion o fin inesperado del stream) pasaria en silencio. Solo
+        # se registra en live. NO reintenta ni reconecta: solo hace OBSERVABLE la terminacion.
+        _pipeline_task.add_done_callback(_on_pipeline_task_done)
         logger.info(
             "Live started (replay bootstrap): %s %s %s stype=%s, replay_start=%s, ReconnectPolicy=NONE.",
             _settings.databento_dataset,
@@ -299,6 +342,10 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    # PRE_AWS_LIVE_HARDENING: senala apagado ANTES de detener la fuente o cancelar la tarea, para que
+    # el supervisor NO reporte como fallo la cancelacion esperada y /health responda "shutting_down".
+    _shutdown_in_progress = True
+
     # Shutdown: stop replay and cancel tasks
     if _replay is not None:
         _replay.stop()
@@ -318,18 +365,89 @@ async def lifespan(app: FastAPI):
     logger.info("TradeCore shutdown complete.")
 
 
+def _on_pipeline_task_done(task) -> None:
+    """PRE_AWS_LIVE_HARDENING: supervisor de la tarea live (done_callback, solo en live).
+
+    Hace OBSERVABLE una terminacion del pipeline live. No reintenta, no reconecta, no lanza gap
+    recovery: solo registra. Ramas:
+    - apagado en curso  -> no loguea (la cancelacion es esperada).
+    - task.cancelled()  -> no loguea (no se llama exception() sobre una tarea cancelada).
+    - termino con excepcion -> 1 CRITICAL con la causa.
+    - termino sin excepcion -> 1 CRITICAL (fin inesperado del stream, sin error explicito).
+    """
+    if _shutdown_in_progress:
+        return
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.critical("Pipeline live terminado por excepcion: %r", exc)
+    else:
+        logger.critical(
+            "Pipeline live termino inesperadamente sin excepcion (stream agotado); dashboard sin "
+            "actualizaciones. Requiere reinicio del servicio."
+        )
+
+
 # Create FastAPI app
 app = FastAPI(title="TradeCore MVP", lifespan=lifespan)
 
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for ECS Express Mode.
+    """Health check endpoint.
 
-    Returns 200 OK regardless of pipeline state — must respond
-    even during startup before components are initialized.
+    En simulation (o antes de tener settings) devuelve EXACTAMENTE 200 {"status":"ok"}, igual que
+    siempre. En live (PRE_AWS_LIVE_HARDENING) deriva la fase del pipeline y responde fail-fast:
+    un pipeline muerto o un bootstrap estancado se reportan como no saludables (503) para que el
+    orquestador (ECS/ALB) lo detecte, en vez de servir 200 con el dashboard congelado.
     """
-    return {"status": "ok"}
+    global _stall_warning_logged
+
+    # Guard: solo live usa el contrato nuevo. Sin settings o en simulation => salud historica intacta.
+    if _settings is None or _settings.mode != "live":
+        return {"status": "ok"}
+
+    # 1) La tarea aun no se creo (arranque muy temprano).
+    if _pipeline_task is None:
+        return {"status": "ok", "phase": "starting", "mode": "live"}
+
+    # 2) Apagado en curso: cancelaciones esperadas, no es un fallo.
+    if _shutdown_in_progress:
+        return {"status": "ok", "phase": "shutting_down", "mode": "live"}
+
+    # 3) Tarea terminada mientras el servicio deberia estar vivo => pipeline muerto.
+    if _pipeline_task.done():
+        return JSONResponse(
+            status_code=503,
+            content={"status": "down", "phase": "terminal", "mode": "live"},
+        )
+
+    # replay completo? se lee del global _replay (LiveCandleSource en live), sin crear estado nuevo.
+    replay_complete = _replay is not None and getattr(_replay, "is_replay_complete", False)
+
+    # 4/5) Aun en bootstrap (replay incompleto): el deadline SOLO aplica aqui.
+    if not replay_complete:
+        elapsed = None
+        if _live_bootstrap_started_at is not None:
+            elapsed = time.monotonic() - _live_bootstrap_started_at
+        if elapsed is not None and elapsed > BOOTSTRAP_STALL_DEADLINE_SECONDS:
+            # Bootstrap estancado: un solo WARNING aunque /health se consulte muchas veces.
+            if not _stall_warning_logged:
+                logger.warning(
+                    "Bootstrap live estancado (stall): %.0fs sin REPLAY_COMPLETED "
+                    "(deadline %.0fs). Reportando 503 para que el orquestador reaccione.",
+                    elapsed, BOOTSTRAP_STALL_DEADLINE_SECONDS,
+                )
+                _stall_warning_logged = True
+            return JSONResponse(
+                status_code=503,
+                content={"status": "down", "phase": "bootstrap_stalled", "mode": "live"},
+            )
+        return {"status": "ok", "phase": "bootstrapping", "mode": "live"}
+
+    # 6) Tarea viva y replay completo: operacion normal. El deadline ya no cuenta.
+    return {"status": "ok", "phase": "live", "mode": "live"}
 
 
 # Serve static files from dashboard/ directory
