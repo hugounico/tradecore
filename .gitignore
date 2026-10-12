@@ -50,3 +50,8 @@ scripts/_inspect_out.txt
 scripts/_download_run_decoded.txt
 scripts/_inspect_sdk.py
 scripts/_decode_log.py
+
+# A2 hygiene: ignorar TODO el contenido de datos historicos locales (parquet, rar, etc.),
+# manteniendo rastreables solo los metadatos .meta.json. Amplia la regla previa de *.parquet.
+data/historical/*
+!data/historical/*.meta.json
