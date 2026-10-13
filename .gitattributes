@@ -1,0 +1,15 @@
+# A2 hygiene: normalizacion de fin de linea (EOL) y marcado de binarios.
+# "text=auto eol=lf": git normaliza los archivos de texto a LF al guardarlos en el repo,
+# evitando diferencias CRLF/LF entre Windows y Linux (la causa de las diferencias EOL_ONLY
+# vistas al congelar v1.0-live). Verificado antes: ningun archivo de texto rastreado estaba
+# como i/crlf o i/mixed, por lo que esta regla no altera el contenido existente.
+* text=auto eol=lf
+
+# Binarios: nunca aplicar conversion de EOL ni diffs de texto.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.parquet binary
+*.rar binary
+*.zip binary
