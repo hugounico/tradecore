@@ -280,6 +280,7 @@
         // handlers (para que un onclose tardio NO dispare otra reconexion) y lo cierra.
         // Asi garantizamos que solo exista UN socket activo en todo momento.
         function teardownSocket() {
+            clearWatchdog();
             if (ws) {
                 ws.onopen = null;
                 ws.onmessage = null;
@@ -304,6 +305,7 @@
 
             ws = new WebSocket(wsUrl);
             var thisWs = ws;  // captura para ignorar eventos de sockets ya reemplazados
+            resetWatchdog();  // vigila desde la creacion: si nunca llega un mensaje, reconecta
 
             ws.onopen = function () {
                 // NO reseteamos reconnectAttempts aqui: abrir el socket no garantiza
@@ -335,6 +337,7 @@
 
             ws.onclose = function () {
                 if (thisWs !== ws) { return; }  // cierre de un socket viejo: ignorar
+                clearWatchdog();
                 refreshStatus();
                 scheduleReconnect();
             };
@@ -367,8 +370,16 @@
         }
 
         // --- Watchdog: vigila que sigan llegando mensajes ---
+        // Unico punto que cancela el watchdog (evita timers huerfanos de sockets viejos).
+        function clearWatchdog() {
+            if (watchdogTimer !== null) {
+                clearTimeout(watchdogTimer);
+                watchdogTimer = null;
+            }
+        }
+
         function resetWatchdog() {
-            if (watchdogTimer) { clearTimeout(watchdogTimer); }
+            clearWatchdog();
             watchdogTimer = setTimeout(function () {
                 // Silencio prolongado: trata la conexion como muerta y reconecta.
                 // teardownSocket() quita handlers, por eso el onclose NO disparara otra
