@@ -18,6 +18,7 @@ Terminology:
 
 import asyncio
 import json
+import time
 
 import pytest
 from unittest.mock import AsyncMock
@@ -128,3 +129,59 @@ class TestMultiClientBroadcast:
         # B got the batch; A timed out and was removed.
         assert b.send_text.await_count == 1
         assert pusher.connection_count == 1
+
+
+class TestHeartbeatBroadcast:
+    """H1-H2: send_heartbeat llega a todos, no toca la cola y descarta clientes muertos."""
+
+    async def test_h1_heartbeat_reaches_all_clients_without_consuming_queue(self):
+        """H1: el heartbeat se difunde a todos SIN pasar por el throttle ni vaciar la cola.
+
+        Encolamos una vela y fijamos _last_push_time al "ahora" (como si acabara de
+        haber un flush), de modo que un flush normal NO enviaria todavia. Aun asi, el
+        heartbeat debe salir de inmediato a cada cliente, y la vela encolada debe seguir
+        pendiente (el heartbeat es un canal aparte, no consume _pending_messages).
+        """
+        pusher = ThrottledPusher(throttle_interval=1.0)
+        a, b = _mock_ws(), _mock_ws()
+        pusher.add_connection(a)
+        pusher.add_connection(b)
+
+        # Simula "recien hubo un push" para que el throttle bloquee un flush normal.
+        pusher._last_push_time = time.time()
+        await pusher.queue_candle(_candle())
+
+        await pusher.send_heartbeat(True)
+
+        # Cada cliente recibio exactamente 1 envio (el heartbeat).
+        assert a.send_text.await_count == 1
+        assert b.send_text.await_count == 1
+        # El contenido es un heartbeat con market_open == True.
+        payload_a = json.loads(a.send_text.await_args.args[0])
+        assert payload_a["type"] == "heartbeat"
+        assert payload_a["data"]["market_open"] is True
+        # La vela encolada NO se consumio: sigue pendiente para el proximo flush.
+        assert len(pusher._pending_messages) == 1
+
+    async def test_h2_heartbeat_drops_failing_client_without_raising(self):
+        """H2: si el send de un cliente falla, el heartbeat no lanza y lo descarta.
+
+        A recibe el latido; B (cuyo send_text lanza) se elimina del conjunto activo.
+        """
+        pusher = ThrottledPusher(throttle_interval=1.0)
+        a, b = _mock_ws(), _mock_ws()
+        b.send_text = AsyncMock(side_effect=RuntimeError("socket closed"))
+        pusher.add_connection(a)
+        pusher.add_connection(b)
+
+        # No debe propagar la excepcion de B.
+        await pusher.send_heartbeat(False)
+
+        # A recibio el latido.
+        assert a.send_text.await_count == 1
+        payload_a = json.loads(a.send_text.await_args.args[0])
+        assert payload_a["type"] == "heartbeat"
+        assert payload_a["data"]["market_open"] is False
+        # B fue descartado; solo queda A registrado.
+        assert pusher.connection_count == 1
+        assert a in pusher._connections

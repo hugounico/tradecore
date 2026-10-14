@@ -92,3 +92,30 @@ class TestUtcInputConverted:
         assert is_regular_market_open(datetime(2026, 1, 5, 22, 30, tzinfo=timezone.utc)) is False
         # 2026-01-05 (lunes) 15:00 UTC == 09:00 CT -> abierto.
         assert is_regular_market_open(datetime(2026, 1, 5, 15, 0, tzinfo=timezone.utc)) is True
+
+
+class TestDaylightSavingTime:
+    """Horario de verano (DST): en verano Chicago es CDT (UTC-5), no CST (UTC-6).
+
+    Verifica que la pausa diaria 16:00-17:00 CT se detecte en el offset correcto
+    cuando la entrada viene en UTC, incluido el dia mismo del cambio de hora.
+    """
+
+    def test_monday_summer_maintenance_window_utc(self):
+        # 2026-07-06 es lunes, en DST (CDT = UTC-5).
+        # 20:59 UTC == 15:59 CDT -> abierto (antes de la pausa).
+        assert is_regular_market_open(datetime(2026, 7, 6, 20, 59, tzinfo=timezone.utc)) is True
+        # 21:00 UTC == 16:00 CDT -> inicio de la pausa -> cerrado.
+        assert is_regular_market_open(datetime(2026, 7, 6, 21, 0, tzinfo=timezone.utc)) is False
+        # 21:59 UTC == 16:59 CDT -> dentro de la pausa -> cerrado.
+        assert is_regular_market_open(datetime(2026, 7, 6, 21, 59, tzinfo=timezone.utc)) is False
+        # 22:00 UTC == 17:00 CDT -> reapertura -> abierto.
+        assert is_regular_market_open(datetime(2026, 7, 6, 22, 0, tzinfo=timezone.utc)) is True
+
+    def test_sunday_dst_change_day_open_utc(self):
+        # 2026-03-08 es domingo y el dia del cambio a DST (spring-forward a las 02:00).
+        # Tras el cambio, el resto del dia es CDT (UTC-5).
+        # 21:59 UTC == 16:59 CDT (domingo, antes de las 17:00) -> cerrado.
+        assert is_regular_market_open(datetime(2026, 3, 8, 21, 59, tzinfo=timezone.utc)) is False
+        # 22:00 UTC == 17:00 CDT -> apertura del domingo -> abierto.
+        assert is_regular_market_open(datetime(2026, 3, 8, 22, 0, tzinfo=timezone.utc)) is True

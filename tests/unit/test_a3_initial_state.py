@@ -22,7 +22,7 @@ Terminology:
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -131,3 +131,148 @@ class TestInitialLoadMarketOpen:
 
         assert msg_open["data"]["market_open"] is True
         assert msg_closed["data"]["market_open"] is False
+
+
+# ---------------------------------------------------------------------------
+# S1: initial_load's session signals are filtered to the buffer's time range
+# ---------------------------------------------------------------------------
+
+class TestInitialLoadSessionHistoryFiltering:
+    """S1: solo las senales dentro del rango [primera, ultima] vela aparecen."""
+
+    def test_s1_session_signals_filtered_to_buffer_range(self, monkeypatch):
+        """Con 21 velas (replay vacio, sin cruces), el initial_load incluye SOLO la
+        senal cuyo timestamp cae dentro del rango temporal del buffer.
+
+        Se inyectan 3 senales en el historial del modulo DESPUES de arrancar el app
+        (el arranque reinicia _signal_history): una antes de la primera vela, una
+        dentro del rango, y una despues de la ultima. initial_load debe traer solo la
+        de dentro, en el formato exacto de signal_payload.
+        """
+        monkeypatch.setenv("DATABENTO_API_KEY", "test-key-dummy")
+        monkeypatch.setenv("MODE", "simulation")
+
+        # 21 velas consecutivas de 1 min, todas close=100.0: el split en sma_slow_period
+        # (21) deja el replay vacio, asi que no hay cruces ni senales emitidas por el
+        # pipeline. El buffer cubre el rango [10:00, 10:20].
+        velas = [_candle(m, 100.0) for m in range(21)]
+
+        # Modulo (no la instancia FastAPI): lo tomamos de sys.modules para evitar la
+        # ambiguedad del nombre `app` (que en este modulo de test ya apunta a la app).
+        import sys
+        app_module = sys.modules["src.api.app"]
+        from src.api.throttled_pusher import signal_payload
+
+        # Timestamps construidos a mano: 1 min antes de la primera vela (10:00) y 1 min
+        # despues de la ultima (10:20). El helper _signal() solo cubre minutos 0..59.
+        base = datetime(2024, 6, 1, 10, 0, 0, tzinfo=timezone.utc)
+        antes = Signal(type=SignalType.BUY, timestamp=base - timedelta(minutes=1),
+                       price=100.0, sma_fast=99.0, sma_slow=98.0)   # 09:59, antes de vela[0]
+        dentro = _signal(10, SignalType.SELL, price=100.0)           # 10:10, dentro del rango
+        despues = Signal(type=SignalType.BUY, timestamp=base + timedelta(minutes=21),
+                         price=100.0, sma_fast=99.0, sma_slow=98.0)  # 10:21, despues de vela[20]
+
+        with patch(
+            "src.api.app.DabentoConnector.load_historical",
+            new_callable=AsyncMock,
+            return_value=velas,
+        ):
+            with TestClient(app) as tc:
+                # El lifespan ya reinicio _signal_history; inyectamos las 3 senales
+                # DESPUES de arrancar, accediendo via el modulo (no por import directo,
+                # que capturaria el deque viejo previo al arranque).
+                app_module._signal_history.append(antes)
+                app_module._signal_history.append(dentro)
+                app_module._signal_history.append(despues)
+
+                with tc.websocket_connect("/ws/chart") as ws:
+                    msg = json.loads(ws.receive_text())
+
+        assert msg["type"] == "initial_load"
+        # Solo la senal de dentro del rango, en el formato exacto de signal_payload.
+        assert msg["data"]["signals"] == [signal_payload(dentro)]
+
+
+# ---------------------------------------------------------------------------
+# S2: _processing_loop only records EMITTED signals (suppressed ones are dropped)
+# ---------------------------------------------------------------------------
+
+class _FakeReplay:
+    """Fuente de velas falsa: su replay() async produce `candles` y termina."""
+
+    def __init__(self, candles):
+        self._candles = candles
+
+    async def replay(self):
+        for c in self._candles:
+            yield c
+
+
+class _FakeEngine:
+    """Motor falso: evaluate() devuelve SIEMPRE una Signal (fuerza el camino de emision)."""
+
+    def evaluate(self, closes):
+        last = closes[-1] if closes else 100.0
+        return Signal(
+            type=SignalType.BUY,
+            timestamp=datetime(2024, 6, 1, 10, 0, 0, tzinfo=timezone.utc),
+            price=last,
+            sma_fast=last,
+            sma_slow=last,
+        )
+
+
+class _FakeSettings:
+    """Settings minimo para el loop (solo los atributos que lee)."""
+
+    sma_fast_period = 9
+    sma_slow_period = 21
+    mode = "simulation"
+
+
+class TestProcessingLoopSignalHistory:
+    """S2: el loop guarda en _signal_history solo las senales EMITIDAS (no las suprimidas)."""
+
+    async def _run_loop(self, monkeypatch, suppress):
+        """Arma el modulo con dobles y corre _processing_loop con el predicado dado.
+
+        Devuelve (pusher, signal_history_len) tras ejecutar el loop.
+        """
+        import sys
+        from collections import deque
+
+        # Modulo (no la instancia FastAPI): via sys.modules para evitar la ambiguedad
+        # del nombre `app` ya ligado en este modulo de test.
+        app_module = sys.modules["src.api.app"]
+        from src.pipeline.candle_buffer import CandleBuffer
+
+        # 25 velas: con sma_slow_period=21, el buffer supera el minimo y se recorre el
+        # camino de SMA; cada evaluate() del motor falso devuelve una Signal.
+        velas = [_candle(m, 100.0 + m) for m in range(25)]
+
+        pusher = AsyncMock()
+        hist = deque()
+
+        monkeypatch.setattr(app_module, "_replay", _FakeReplay(velas))
+        monkeypatch.setattr(app_module, "_buffer", CandleBuffer())
+        monkeypatch.setattr(app_module, "_engine", _FakeEngine())
+        monkeypatch.setattr(app_module, "_pusher", pusher)
+        monkeypatch.setattr(app_module, "_settings", _FakeSettings())
+        monkeypatch.setattr(app_module, "_signal_history", hist)
+
+        await app_module._processing_loop(suppress_signals=suppress)
+        return pusher, hist
+
+    async def test_s2_suppressed_signals_not_recorded(self, monkeypatch):
+        """Caso suprimido: queue_signal NO se llama y _signal_history queda vacio."""
+        pusher, hist = await self._run_loop(monkeypatch, suppress=lambda: True)
+
+        assert pusher.queue_signal.await_count == 0
+        assert len(hist) == 0
+
+    async def test_s2_emitted_signals_recorded_positive_control(self, monkeypatch):
+        """Control positivo: sin supresion, queue_signal se llama y el historial crece."""
+        pusher, hist = await self._run_loop(monkeypatch, suppress=lambda: False)
+
+        assert pusher.queue_signal.await_count > 0
+        assert len(hist) > 0

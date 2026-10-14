@@ -72,9 +72,8 @@ _flush_task: asyncio.Task | None = None
 _pipeline_task: asyncio.Task | None = None
 _heartbeat_task: asyncio.Task | None = None
 
-# A3a: historial de senales EMITIDAS en la sesion (no las suprimidas durante el replay). Se usa
-# para repintar los marcadores BUY/SELL en el estado inicial de un cliente que (re)conecta. Cada
-# entrada ya esta en el formato de signal_payload(). Se reinicia en cada lifespan.
+# A3a: historial de senales EMITIDAS (objetos Signal; las suprimidas en el replay no se guardan).
+# Se serializan con signal_payload() al construir initial_load. Se reinicia en cada lifespan.
 _signal_history: deque = deque(maxlen=SIGNAL_HISTORY_MAX)
 
 # PRE_AWS_LIVE_HARDENING: estado minimo para derivar la salud del pipeline live. NO es una maquina de
