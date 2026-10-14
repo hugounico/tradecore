@@ -258,9 +258,9 @@
     },
     "tests.property.test_phase2_preservation::test_ws_chart_accepts_connections": {
       "flaky": false,
-      "result": "failed",
-      "run1": "failed",
-      "run2": "failed"
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
     },
     "tests.property.test_risk_gate_props.TestRiskGateMonotonicity::test_larger_stop_never_increases_position_size": {
       "flaky": false,

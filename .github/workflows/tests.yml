@@ -10,9 +10,18 @@ on:
   push:
     branches: [develop, main]
 
+# Minimo privilegio: el workflow solo necesita leer el codigo del repo (checkout).
+# Sin esto, GITHUB_TOKEN hereda permisos amplios por defecto. "contents: read" es
+# suficiente para checkout + subir el artifact de junit.
+permissions:
+  contents: read
+
 jobs:
   tests:
     runs-on: ubuntu-latest
+    # Corta ejecuciones colgadas: si el job supera 15 min, GitHub lo cancela. La suite
+    # real corre en ~1-2 min; 15 min es un techo amplio para no cancelar corridas validas.
+    timeout-minutes: 15
     # Contenedor con el MISMO Python que produccion (3.11.16). La etiqueta
     # python:3.11.16-slim fue verificada con `docker manifest inspect` antes de fijarla.
     container: python:3.11.16-slim

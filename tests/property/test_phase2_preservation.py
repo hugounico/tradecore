@@ -94,7 +94,7 @@ async def test_nonexistent_route_returns_404():
     )
 
 
-def test_ws_chart_accepts_connections():
+def test_ws_chart_accepts_connections(monkeypatch):
     """El WebSocket en /ws/chart acepta conexiones — comportamiento a preservar.
 
     Requirement 3.2: /ws/chart SIGUE aceptando conexiones WebSocket.
@@ -107,12 +107,29 @@ def test_ws_chart_accepts_connections():
     servidor cierra luego con codigo 1011, pero el handshake ya ocurrio.
     Instanciamos el TestClient DENTRO del test (no a nivel de modulo) para que su
     hilo interno se cierre limpiamente al salir del `with`.
+
+    AISLAMIENTO DEL ENTORNO (A3a): el `with TestClient(app)` dispara el lifespan de
+    la app, que construye Settings() y, en 'simulation', llama a load_historical en
+    Databento. Sin esto, el test dependia de que exista DATABENTO_API_KEY en el
+    entorno y de que Databento responda (fallaba en CI/entornos limpios). Replicamos
+    el mismo aislamiento que tests/integration/test_e2e.py: fijamos una API key dummy
+    y mockeamos load_historical para que el arranque sea deterministico y offline.
+    Esto NO cambia lo que el test verifica: que /ws/chart acepta la conexion.
     """
+    from unittest.mock import AsyncMock, patch
+
+    monkeypatch.setenv("DATABENTO_API_KEY", "test-key-dummy")
+
     # Si el handshake fallara, `websocket_connect` lanzaria excepcion -> test falla.
-    with TestClient(app) as client:
-        with client.websocket_connect("/ws/chart") as websocket:
-            # Llegar aca sin excepcion confirma que el servidor ACEPTO la conexion.
-            assert websocket is not None
+    with patch(
+        "src.api.app.DabentoConnector.load_historical",
+        new_callable=AsyncMock,
+        return_value=[],
+    ):
+        with TestClient(app) as client:
+            with client.websocket_connect("/ws/chart") as websocket:
+                # Llegar aca sin excepcion confirma que el servidor ACEPTO la conexion.
+                assert websocket is not None
 
 
 # --- Enfoque PBT (Property-Based Testing) para Issue 1 ---

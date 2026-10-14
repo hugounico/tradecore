@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import time
+from collections import deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -20,7 +21,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from src.api.throttled_pusher import ThrottledPusher
+from src.api.market_hours import is_regular_market_open
+from src.api.throttled_pusher import ThrottledPusher, signal_payload
 from src.config import Settings
 from src.connectors.databento_connector import DabentoConnector
 from src.engine.signal_engine import SignalEngine
@@ -50,6 +52,16 @@ REPLAY_COMPLETION_TIMEOUT_SECONDS = 30.0
 # REPLAY_COMPLETED; una vez el replay se completa, la fase "live" nunca vuelve a mirar este deadline.
 BOOTSTRAP_STALL_DEADLINE_SECONDS = 300.0
 
+# A3a: cada cuantos segundos el backend emite un heartbeat (latido) a los navegadores.
+# 15s deja al cliente margen para detectar un corte silencioso bastante antes de su watchdog
+# (45s), sin saturar la conexion. El heartbeat NO pasa por el throttle de 1s del pusher.
+HEARTBEAT_INTERVAL_SECONDS = 15.0
+
+# A3a: tope de senales de la sesion que se recuerdan para repintarlas en el estado inicial
+# (initial_load) de un cliente que (re)conecta. 500 cubre de sobra una sesion normal sin crecer
+# sin limite en memoria; al llenarse, descarta las mas viejas (deque con maxlen).
+SIGNAL_HISTORY_MAX = 500
+
 # Module-level state shared across the app
 _settings: Settings | None = None
 _buffer: CandleBuffer | None = None
@@ -58,6 +70,11 @@ _engine: SignalEngine | None = None
 _replay: SimulationReplay | None = None
 _flush_task: asyncio.Task | None = None
 _pipeline_task: asyncio.Task | None = None
+_heartbeat_task: asyncio.Task | None = None
+
+# A3a: historial de senales EMITIDAS (objetos Signal; las suprimidas en el replay no se guardan).
+# Se serializan con signal_payload() al construir initial_load. Se reinicia en cada lifespan.
+_signal_history: deque = deque(maxlen=SIGNAL_HISTORY_MAX)
 
 # PRE_AWS_LIVE_HARDENING: estado minimo para derivar la salud del pipeline live. NO es una maquina de
 # estados persistida; la fase se DERIVA en cada consulta a /health a partir de estos valores.
@@ -84,8 +101,18 @@ def _build_initial_load_message(
     candles: list[Candle],
     sma_fast_period: int,
     sma_slow_period: int,
+    signals: list | None = None,
+    market_open: bool | None = None,
 ) -> dict:
-    """Build the initial_load WebSocket message with candles and pre-computed SMA series."""
+    """Build the initial_load WebSocket message with candles and pre-computed SMA series.
+
+    A3a: ademas de velas y SMA, el estado inicial incluye las senales de la sesion
+    (`signals`, para repintar los marcadores al (re)conectar) y la bandera `market_open`.
+    `signals` se recibe como lista de Signal; cada una se serializa con signal_payload()
+    y se ordena ascendente por tiempo. Ambos parametros son opcionales para no romper a
+    los llamadores existentes (tests de preservacion): por defecto signals=[] y
+    market_open=None.
+    """
     candle_dicts = [
         {
             "time": int(c.timestamp.timestamp()),
@@ -119,12 +146,21 @@ def _build_initial_load_message(
                 "value": round(sma_slow_val, 2),
             })
 
+    # A3a: serializa las senales de la sesion con el MISMO formato que los updates en vivo
+    # (signal_payload) y las ordena ascendente por tiempo para que el frontend pinte los
+    # marcadores en orden. signals=None => lista vacia (sesion sin senales todavia).
+    signal_dicts = [signal_payload(s) for s in (signals or [])]
+    signal_dicts.sort(key=lambda s: s["time"])
+
     return {
         "type": "initial_load",
         "data": {
             "candles": candle_dicts,
             "sma_fast_series": sma_fast_series,
             "sma_slow_series": sma_slow_series,
+            # A3a: senales de la sesion (marcadores) y bandera de mercado abierto.
+            "signals": signal_dicts,
+            "market_open": market_open,
         },
     }
 
@@ -144,6 +180,26 @@ async def _flush_loop() -> None:
             await asyncio.sleep(0.1)
 
 
+async def _heartbeat_loop() -> None:
+    """A3a: broadcast a heartbeat to all clients every HEARTBEAT_INTERVAL_SECONDS.
+
+    El latido lleva la bandera `market_open` (horario regular de CME) para que el navegador
+    distinga "mercado cerrado" de "conexion caida". Los errores se registran pero NO matan el
+    loop: un fallo puntual de envio no debe detener los latidos siguientes.
+    """
+    global _pusher
+    while True:
+        try:
+            await asyncio.sleep(HEARTBEAT_INTERVAL_SECONDS)
+            if _pusher is not None:
+                market_open = is_regular_market_open(datetime.now(timezone.utc))
+                await _pusher.send_heartbeat(market_open)
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.debug("Heartbeat loop error: %s", exc)
+
+
 async def _processing_loop(suppress_signals=None) -> None:
     """Receive candles from a CandleSource and process through the pipeline.
 
@@ -154,7 +210,7 @@ async def _processing_loop(suppress_signals=None) -> None:
     intacto. La frontera REPLAY->LIVE la decide EXCLUSIVAMENTE quien construye este predicado
     (en el slice: SystemCode.REPLAY_COMPLETED via la fuente Live), NO un conteo de velas aqui.
     """
-    global _replay, _buffer, _engine, _pusher, _settings
+    global _replay, _buffer, _engine, _pusher, _settings, _signal_history
 
     if _replay is None or _buffer is None or _engine is None or _pusher is None:
         logger.error("Pipeline components not initialized for processing loop.")
@@ -195,6 +251,9 @@ async def _processing_loop(suppress_signals=None) -> None:
                     )
                 else:
                     await _pusher.queue_signal(signal)
+                    # A3a: recuerda la senal EMITIDA (no las suprimidas) para repintar sus
+                    # marcadores en el estado inicial de clientes que (re)conecten luego.
+                    _signal_history.append(signal)
                     logger.info("Signal generated: %s at %.2f", signal.type.value, signal.price)
 
         except Exception as exc:
@@ -213,6 +272,7 @@ async def _processing_loop(suppress_signals=None) -> None:
 async def lifespan(app: FastAPI):
     """Application lifespan: setup on startup, cleanup on shutdown."""
     global _settings, _buffer, _pusher, _engine, _replay, _flush_task, _pipeline_task
+    global _heartbeat_task, _signal_history
     global _live_bootstrap_started_at, _shutdown_in_progress, _stall_warning_logged
 
     # PRE_AWS_LIVE_HARDENING (D1): reinicia el estado de salud del pipeline al comenzar CADA lifespan,
@@ -222,6 +282,10 @@ async def lifespan(app: FastAPI):
     _live_bootstrap_started_at = None
     _shutdown_in_progress = False
     _stall_warning_logged = False
+
+    # A3a: cada arranque empieza con un historial de senales limpio (sin arrastrar la sesion previa
+    # si el proceso reutiliza el modulo, p. ej. en tests que levantan el app varias veces).
+    _signal_history = deque(maxlen=SIGNAL_HISTORY_MAX)
 
     # Load settings
     _settings = Settings()
@@ -238,6 +302,9 @@ async def lifespan(app: FastAPI):
 
     # Start flush loop
     _flush_task = asyncio.create_task(_flush_loop())
+
+    # A3a: start heartbeat loop (latido periodico a todos los navegadores conectados).
+    _heartbeat_task = asyncio.create_task(_heartbeat_loop())
 
     if _settings.mode == "simulation":
         # Load historical candles
@@ -361,6 +428,12 @@ async def lifespan(app: FastAPI):
             await _flush_task
         except asyncio.CancelledError:
             pass
+    if _heartbeat_task is not None:
+        _heartbeat_task.cancel()
+        try:
+            await _heartbeat_task
+        except asyncio.CancelledError:
+            pass
 
     logger.info("TradeCore shutdown complete.")
 
@@ -458,12 +531,15 @@ if _dashboard_path.exists():
 
 @app.websocket("/ws/chart")
 async def websocket_chart(ws: WebSocket) -> None:
-    """WebSocket endpoint for real-time chart updates.
+    """WebSocket endpoint for real-time chart updates (multi-cliente).
 
-    Accepts a single connection, sends initial_load with candles and SMA series,
-    then keeps alive while the flush loop sends incremental updates.
+    A3a: soporta VARIOS navegadores a la vez. Cada cliente recibe SIEMPRE un initial_load
+    (aunque el buffer este vacio: candles=[], signals=[]), con las senales de la sesion y la
+    bandera de mercado abierto, y luego se registra en el pusher para recibir los updates
+    incrementales por broadcast. El registro se hace SIN ningun await entre tomar el snapshot
+    del buffer y add_connection, para que el cliente no se pierda un flush intermedio.
     """
-    global _pusher, _buffer, _settings
+    global _pusher, _buffer, _settings, _signal_history
 
     await ws.accept()
     logger.info("WebSocket client connected.")
@@ -472,21 +548,43 @@ async def websocket_chart(ws: WebSocket) -> None:
         await ws.close(code=1011, reason="Server not ready")
         return
 
-    # Register connection with pusher
-    await _pusher.set_connection(ws)
+    # --- Snapshot del estado inicial + registro, SIN await intermedio ---------------
+    # Toma el estado actual del buffer y arma el initial_load. Entre esta captura y
+    # add_connection NO hay ningun await: asi el cliente queda registrado con un estado
+    # coherente y no puede perderse un batch enviado "en el medio".
+    candles = _buffer.get_all()
+
+    # Senales de la sesion acotadas al rango temporal del buffer (primera..ultima vela).
+    # Si no hay velas, no hay rango que mostrar -> lista vacia.
+    session_signals: list = []
+    if candles:
+        first_ts = candles[0].timestamp
+        last_ts = candles[-1].timestamp
+        session_signals = [
+            s for s in _signal_history if first_ts <= s.timestamp <= last_ts
+        ]
+
+    market_open = is_regular_market_open(datetime.now(timezone.utc))
+
+    initial_msg = _build_initial_load_message(
+        candles,
+        _settings.sma_fast_period,
+        _settings.sma_slow_period,
+        signals=session_signals,
+        market_open=market_open,
+    )
+
+    # Registra la conexion ANTES del primer envio (sin await desde el snapshot hasta aqui).
+    _pusher.add_connection(ws)
 
     try:
-        # Send initial_load message with current buffer state
-        candles = _buffer.get_all()
-        if candles:
-            initial_msg = _build_initial_load_message(
-                candles,
-                _settings.sma_fast_period,
-                _settings.sma_slow_period,
-            )
-            await ws.send_text(json.dumps(initial_msg))
+        # Envia el estado inicial directamente a ESTE cliente (sin pasar por el throttle).
+        ok = await _pusher.send_direct(ws, json.dumps(initial_msg))
+        if not ok:
+            # El cliente ya no esta disponible: termina y limpia en el finally.
+            return
 
-        # Send status update
+        # Status update (igual que antes: encolado y enviado por el flush loop a todos).
         await _pusher.queue_status(
             connected=True,
             last_time=_buffer.last_timestamp(),
@@ -504,5 +602,6 @@ async def websocket_chart(ws: WebSocket) -> None:
     except Exception as exc:
         logger.warning("WebSocket error: %s", exc)
     finally:
-        await _pusher.set_connection(None)
+        # A3a: elimina SOLO esta conexion (nunca set_connection(None), que las borraria todas).
+        _pusher.remove_connection(ws)
         logger.info("WebSocket connection cleaned up.")
