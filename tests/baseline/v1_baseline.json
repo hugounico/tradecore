@@ -1,0 +1,2445 @@
+{
+  "commit": "b1895b4c3981894deb137a89325e25bc27435163",
+  "flaky_count": 0,
+  "generated_at_utc": "2026-10-12T02:12:15Z",
+  "identity_format": "classname::name",
+  "tests": {
+    "tests.integration.test_e2e.TestE2EPipelineFlow::test_e2e_pipeline_flow": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.integration.test_e2e.TestE2EPipelineFlow::test_e2e_pipeline_with_signal_generation": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.integration.test_e2e.TestPropertyCandleDataIntegrity::test_property_candle_data_integrity_initial_load_format": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.integration.test_e2e.TestPropertyCandleDataIntegrity::test_property_candle_data_integrity_through_buffer": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.integration.test_e2e.TestPropertyCandleDataIntegrity::test_property_candle_data_integrity_through_pusher_format": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.integration.test_e2e.TestPropertyNoDuplicateCandles::test_property_buffer_no_timestamp_regression": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.integration.test_e2e.TestPropertyNoDuplicateCandles::test_property_no_duplicate_candles": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.integration.test_e2e.TestSimulationReplay::test_simulation_replay_delivers_candles": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.integration.test_e2e.TestSimulationReplay::test_simulation_replay_stop": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.integration.test_e2e.TestSimulationReplay::test_simulation_replay_timing": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.integration.test_e2e.TestWebSocketReceivesValidJson::test_websocket_initial_load_candle_count": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.integration.test_e2e.TestWebSocketReceivesValidJson::test_websocket_receives_valid_json": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.integration.test_live_integrated_rehearsal::test_integrated_live_source_through_real_pusher": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.integration.test_live_integrated_rehearsal::test_integrated_two_candles_batched_in_order": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.integration.test_live_mocked_e2e_rehearsal::test_mocked_e2e_dedup_against_last_candle_time": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.integration.test_live_mocked_e2e_rehearsal::test_mocked_e2e_fake_record_to_ws_payload": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_atr_calculator_props.TestATRInsufficientData::test_returns_none_when_insufficient_history": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_atr_calculator_props.TestATRNeverNegative::test_atr_is_never_negative": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_atr_calculator_props.TestATRZeroOnNullRange::test_atr_exactly_zero_when_no_range": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_calibration_props.TestBlockBootstrapReproducibility::test_no_empty_weeks_generated": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_calibration_props.TestBlockBootstrapReproducibility::test_same_seed_same_ci": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_calibration_props.TestBlockBootstrapReproducibility::test_whole_block_preservation": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_calibration_props.TestBlockIdSameIsoWeek::test_different_weeks_different_ids": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_calibration_props.TestBlockIdSameIsoWeek::test_iso_year_boundary_case": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_calibration_props.TestBlockIdSameIsoWeek::test_same_week_same_id": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_calibration_props.TestCliffDeltaProperty::test_cliff_delta_in_range": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_calibration_props.TestNBootstrapBlocks::test_19_blocks_insufficient": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_calibration_props.TestNBootstrapBlocks::test_20_blocks_eligible": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_calibration_props.TestNBootstrapBlocks::test_distinct_non_empty_blocks": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_calibration_props.TestStepPopulationProperty::test_counters_consistent": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_phase2_bug_exploration::test_debug_network_get_returns_404": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_phase2_bug_exploration::test_debug_network_post_blocked": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_phase2_bug_exploration::test_issue2_case_a_valid_iso_shows_time": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_phase2_bug_exploration::test_issue2_case_b_null_shows_fallback": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_phase2_bug_exploration::test_issue2_case_c_empty_string_shows_fallback": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_phase2_bug_exploration::test_issue2_case_c_invalid_string_shows_fallback": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_phase2_bug_exploration::test_issue2_property_invalid_inputs_show_fallback": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_phase2_preservation::test_health_returns_200_ok": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_phase2_preservation::test_issue2_preservation_valid_iso_unchanged_example": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_phase2_preservation::test_issue2_property_valid_iso_preserved": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_phase2_preservation::test_nonexistent_route_returns_404": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_phase2_preservation::test_random_non_debug_paths_return_404": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_phase2_preservation::test_ws_chart_accepts_connections": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_risk_gate_props.TestRiskGateMonotonicity::test_larger_stop_never_increases_position_size": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_risk_gate_props.TestRiskGateNoDivisionByZero::test_stop_none_returns_none_never_raises": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_risk_gate_props.TestRiskGateNoDivisionByZero::test_stop_zero_returns_none_never_raises": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_risk_gate_props.TestRiskGateReturnTypeAndRiskCap::test_integer_result_and_risk_never_exceeds_cap": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_signal_engine_props.TestNoSignalOnInsufficientData::test_no_signal_with_insufficient_data": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_signal_engine_props.TestSMAComputationCorrectness::test_sma_equals_arithmetic_mean": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_signal_engine_props.TestSMACrossoverSignalCorrectness::test_buy_signal_on_upward_crossover": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_signal_engine_props.TestSMACrossoverSignalCorrectness::test_no_signal_when_no_crossover": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_signal_engine_props.TestSMACrossoverSignalCorrectness::test_sell_signal_on_downward_crossover": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_throttle_props.TestUnifiedVisualThrottleInvariant::test_no_two_sends_within_one_second": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_traceability_props.TestReproducibility::test_same_input_reproduces_identical_record": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_traceability_props.TestTraceabilityCompleteness::test_every_signal_produces_exactly_one_record": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_volume_filter_props.TestVolumeAtOrAboveThresholdPasses::test_at_or_above_threshold_always_passes": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_volume_filter_props.TestVolumeBelowThresholdRejects::test_below_threshold_always_rejects": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.property.test_volume_filter_props.TestVolumeFilterNeverChangesDirection::test_direction_is_preserved": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestBatchArrayStructure::test_batch_contains_multiple_message_types": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestBatchArrayStructure::test_batch_is_json_array": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestBatchArrayStructure::test_batch_preserves_queue_order": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestBatchArrayStructure::test_each_batch_item_has_type_and_data": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestBatchArrayStructure::test_sma_message_format": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestCandleUpdateFormat::test_candle_data_has_required_fields": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestCandleUpdateFormat::test_candle_message_type": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestCandleUpdateFormat::test_candle_prices_are_floats": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestCandleUpdateFormat::test_candle_time_is_unix_integer": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestCandleUpdateFormat::test_candle_volume_is_integer": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestInitialLoadMessageStructure::test_initial_load_candle_has_required_fields": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestInitialLoadMessageStructure::test_initial_load_candle_time_is_integer": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestInitialLoadMessageStructure::test_initial_load_has_data_with_candles": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestInitialLoadMessageStructure::test_initial_load_has_sma_fast_series": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestInitialLoadMessageStructure::test_initial_load_has_sma_slow_series": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestInitialLoadMessageStructure::test_initial_load_has_type_field": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestInitialLoadMessageStructure::test_initial_load_is_json_serializable": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestInitialLoadMessageStructure::test_initial_load_sma_series_entry_has_time_and_value": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestSignalMessageFormat::test_signal_data_has_required_fields": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestSignalMessageFormat::test_signal_message_type": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestSignalMessageFormat::test_signal_price_and_sma_are_floats": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestSignalMessageFormat::test_signal_time_is_unix_integer": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestSignalMessageFormat::test_signal_type_buy_value": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestSignalMessageFormat::test_signal_type_sell_value": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestStatusMessageFormat::test_status_connected_is_boolean": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestStatusMessageFormat::test_status_data_has_required_fields": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestStatusMessageFormat::test_status_last_candle_time_iso_format": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestStatusMessageFormat::test_status_last_candle_time_none_when_no_candles": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestStatusMessageFormat::test_status_message_type": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_api.TestStatusMessageFormat::test_status_mode_is_string": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_app.TestBuildInitialLoadMessage::test_candle_count_matches_input": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_app.TestBuildInitialLoadMessage::test_candle_fields": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_app.TestBuildInitialLoadMessage::test_message_is_json_serializable": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_app.TestBuildInitialLoadMessage::test_returns_correct_structure": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_app.TestBuildInitialLoadMessage::test_sma_fast_series_starts_at_correct_position": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_app.TestBuildInitialLoadMessage::test_sma_series_empty_when_not_enough_candles": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_app.TestBuildInitialLoadMessage::test_sma_slow_series_starts_at_correct_position": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_app.TestBuildInitialLoadMessage::test_sma_values_are_correct": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_app.TestBuildInitialLoadMessage::test_time_is_unix_timestamp": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_app_live_bootstrap::test_default_no_suppression_emits_signals": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_app_live_bootstrap::test_empty_replay_then_live_no_premature_signal": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_app_live_bootstrap::test_insufficient_replay_then_live_emits_when_ready": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_app_live_bootstrap::test_replay_signals_suppressed_until_boundary_regardless_of_count": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_app_live_bootstrap::test_signal_after_boundary_reaches_pusher": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_atr_calculator.TestATRDeterministicWilder::test_atr_matches_hand_computed_wilder_value": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_atr_calculator.TestATRDeterministicWilder::test_stop_points_uses_atr_times_multiplier": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_atr_calculator.TestATRInsufficientDataDeterministic::test_atr_none_with_exactly_period_candles": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestH3B::test_per_population_recomputation_differs": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestRankingC::test_atr_multiplier_does_not_change_ranking": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestRankingC::test_final_technical_key_volume_threshold": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestRankingC::test_full_lexicographic_order": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestRankingC::test_selected_atr_150_ranking_defined_without_h1": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestRankingC::test_tiebreak_ci_width": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestSequentialAtrSelection::test_initial_insufficiency_no_winner": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestSequentialAtrSelection::test_initial_pass_advances": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestSequentialAtrSelection::test_later_insufficiency_keeps_last_justified": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestSequentialAtrSelection::test_no_step_skipped": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestSequentialAtrSelection::test_no_steps_case_c": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestSequentialAtrSelection::test_pass_pass_fail_selects_second_atr": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestSequentialAtrSelection::test_substantive_fail_at_first_stops_at_150": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestTopN::test_four_valid_yields_exactly_three": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestTopN::test_technical_key_never_exceeds_three": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestTopN::test_two_valid_yields_two_no_filling": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_decisions.TestTopN::test_zero_valid_yields_none": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestAtrNormalization::test_atr_negative_non_evaluable": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestAtrNormalization::test_atr_none_non_evaluable": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestAtrNormalization::test_atr_zero_non_evaluable": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestAtrNormalization::test_normalization_positive_atr": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestBreachCoherence::test_breach_true_when_mae_reaches_m": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestBreachCoherence::test_mae_atr_zero_never_breaches_positive_m": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestH2IntegrationFromLayerA::test_cliff_delta_consumes_layer_a_mae_atr": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestMfeMaePoints::test_buy_favorable_and_adverse": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestMfeMaePoints::test_buy_no_adverse": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestMfeMaePoints::test_buy_no_favorable": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestMfeMaePoints::test_sell_favorable_and_adverse": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestMfeMaePoints::test_sell_no_adverse": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestMfeMaePoints::test_sell_no_favorable": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestSignalPathTemporalEndToEnd::test_9_1_signal_candle_t_excluded": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestSignalPathTemporalEndToEnd::test_9_2_inverse_crossover_candle_included": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestSignalPathTemporalEndToEnd::test_9_3_post_crossover_bar_excluded": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_excursions.TestSignalPathTemporalEndToEnd::test_9_4_boundary_censored_post_boundary_excluded": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_grid.TestFrozenThresholds::test_calibration_window_end_exclusive": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_grid.TestFrozenThresholds::test_thresholds_exact_values": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_grid.TestGridStructure::test_atr_multipliers_exact_list": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_grid.TestGridStructure::test_configuration_counts": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_grid.TestGridStructure::test_consecutive_steps_only": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_grid.TestGridStructure::test_volume_threshold_factors_exact_list": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_grid.TestWarmupMinDynamic::test_warmup_min_changes_with_config": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_grid.TestWarmupMinDynamic::test_warmup_min_current_config_is_22": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_grid.TestWarmupMinDynamic::test_warmup_min_slow_period_dominates": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_grid.TestWarmupMinDynamic::test_warmup_min_volume_period_dominates": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestCliffDelta::test_all_greater_delta_one": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestCliffDelta::test_all_less_delta_minus_one": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestCliffDelta::test_empty_group_none": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestCliffDelta::test_in_range": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestCliffDelta::test_manual_computation": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestCliffDelta::test_ties_neutral": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestEvidenceSufficient::test_all_pass_at_exact_boundaries": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestEvidenceSufficient::test_censoring_above_030_fails": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestEvidenceSufficient::test_censoring_exactly_030_passes": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestEvidenceSufficient::test_rescued_observable_29_fails": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestEvidenceSufficient::test_step_observable_49_fails": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestH2Gate::test_fail_mae_ci_crosses_zero": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestH2Gate::test_fail_mae_effect_too_small": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestH2Gate::test_fail_mfe_ci_crosses_zero": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestH2Gate::test_fail_mfe_effect_too_small": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestH2Gate::test_pass": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestH2Joint::test_joint_censoring_max": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestH2Joint::test_joint_ci_width_max": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestH2Joint::test_joint_effect_min": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestRescueQuality::test_basic": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestRescueQuality::test_population_rate": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestRescueQuality::test_population_rate_zero_denominator": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestRescueQuality::test_zero_denominator_returns_none": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestSecondaryDiagnostics::test_censoring_rate": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestSecondaryDiagnostics::test_censoring_rate_zero_total": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestSecondaryDiagnostics::test_quartiles": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestSecondaryDiagnostics::test_quartiles_empty": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestSecondaryDiagnostics::test_stop_survival_rate": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestSecondaryDiagnostics::test_stop_trigger_rate": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_metrics.TestSecondaryDiagnostics::test_stop_trigger_rate_zero": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestCensoringIndependence::test_partial_censoring_stays_valid": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestCensoringIndependence::test_stop_censored_not_valid": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestPopulationCounters::test_rescued_population_counts": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestPopulationCounters::test_step_population_counts": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestPopulationCounters::test_step_population_empty_no_zerodivision": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestProductiveRescue::test_buy_productive": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestProductiveRescue::test_full_window_no_recovery_false": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestProductiveRescue::test_no_post_touch_bar_unknown": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestProductiveRescue::test_sell_productive": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestProductiveRescue::test_touch_bar_excluded": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestProductiveRescue::test_touch_bar_excluded_even_if_it_reaches_reference": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestRescuedSignal::test_consecutive_step_ok": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestRescuedSignal::test_false_false_gives_false": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestRescuedSignal::test_non_consecutive_step_raises": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestRescuedSignal::test_true_false_gives_true": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestRescuedSignal::test_true_true_gives_false": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestRescuedSignal::test_true_unknown_gives_unknown": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestRescuedSignal::test_unknown_false_gives_unknown": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestStopWouldTriggerThreeStates::test_false_when_inverse_crossover_before_boundary_no_touch": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestStopWouldTriggerThreeStates::test_never_unknown_becomes_false": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestStopWouldTriggerThreeStates::test_sell_touch": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestStopWouldTriggerThreeStates::test_true_when_touched_before_boundary": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_observations.TestStopWouldTriggerThreeStates::test_unknown_when_boundary_reached_no_touch_no_crossover": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestCalibrationBoundaries::test_before_start_is_outside": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestCalibrationBoundaries::test_end_is_excluded": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestCalibrationBoundaries::test_immediately_before_end_is_allowed": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestCalibrationBoundaries::test_start_is_included": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestCalibrationBoundaries::test_validation_and_later_flag": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestCensoredCompletion::test_completion_after_boundary_denied": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestCensoredCompletion::test_completion_at_boundary_denied": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestCensoredCompletion::test_completion_before_boundary_allowed": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestTimestampParsing::test_aware_datetime_accepted": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestTimestampParsing::test_naive_datetime_rejected": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestValidationInaccessible::test_calibration_timestamp_accessible": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestValidationInaccessible::test_reject_final_oos_access": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestValidationInaccessible::test_reject_validation_access": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestWarmupContext::test_warmup_at_or_after_split_start_rejected": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestWarmupContext::test_warmup_before_split_start_ok": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_calibration_split_guard.TestWarmupContext::test_warmup_never_uses_validation": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_buffer.TestCandleBufferAppend::test_append_discards_duplicate_timestamp": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_buffer.TestCandleBufferAppend::test_append_discards_older_timestamp": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_buffer.TestCandleBufferAppend::test_append_drops_oldest_when_exceeds_max_size": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_buffer.TestCandleBufferAppend::test_append_preserves_order": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_buffer.TestCandleBufferAppend::test_append_single_candle": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_buffer.TestCandleBufferGetAll::test_get_all_empty_buffer": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_buffer.TestCandleBufferGetAll::test_get_all_returns_copy": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_buffer.TestCandleBufferGetCloses::test_get_closes_empty_buffer": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_buffer.TestCandleBufferGetCloses::test_get_closes_returns_last_n": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_buffer.TestCandleBufferGetCloses::test_get_closes_when_fewer_than_n": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_buffer.TestCandleBufferInit::test_custom_max_size": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_buffer.TestCandleBufferInit::test_default_max_size_is_500": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_buffer.TestCandleBufferInit::test_empty_buffer_length_is_zero": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_buffer.TestCandleBufferLastTimestamp::test_last_timestamp_after_appends": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_buffer.TestCandleBufferLastTimestamp::test_last_timestamp_empty_buffer": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_source::test_contract_symbols_exist": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_source::test_replay_yields_async_iterator_of_candles": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_candle_source::test_simulation_replay_satisfies_contract_structurally": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_cliff_delta_equivalence.TestBootstrapEndToEndEquivalence::test_ci95_and_gate_identical": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_cliff_delta_equivalence.TestCliffDeltaEmptyGroups::test_both_empty": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_cliff_delta_equivalence.TestCliffDeltaEmptyGroups::test_empty_a": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_cliff_delta_equivalence.TestCliffDeltaEmptyGroups::test_empty_b": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_cliff_delta_equivalence.TestCliffDeltaManualCases::test_a_all_x_greater_y": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_cliff_delta_equivalence.TestCliffDeltaManualCases::test_b_all_x_less_y": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_cliff_delta_equivalence.TestCliffDeltaManualCases::test_c_all_equal": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_cliff_delta_equivalence.TestCliffDeltaManualCases::test_d_known_wins_losses_ties": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_cliff_delta_equivalence.TestCliffDeltaManualCases::test_e_many_duplicates": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_cliff_delta_equivalence.TestCliffDeltaManualCases::test_f_negative_values": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_cliff_delta_equivalence.TestCliffDeltaManualCases::test_g_floats": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_cliff_delta_equivalence.TestCliffDeltaManualCases::test_h_different_sizes": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_cliff_delta_equivalence.TestCliffDeltaProperty::test_optimized_equals_naive": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_cliff_delta_equivalence.TestCliffDeltaProperty::test_optimized_equals_naive_heavy_ties": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_config.TestSettingsDefaults::test_all_defaults_with_api_key": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_config.TestSettingsDefaults::test_mode_default_is_simulation": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_config.TestSettingsOverrides::test_override_log_level": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_config.TestSettingsOverrides::test_override_mode": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_config.TestSettingsOverrides::test_override_sma_periods": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_config.TestSettingsOverrides::test_override_ws_throttle": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_config.TestSettingsValidation::test_missing_api_key_raises_validation_error": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_connection_state::test_initial_state_is_disconnected": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_connection_state::test_is_connected_only_true_for_connected": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_connection_state::test_mark_connected_sets_connected_and_is_connected_true": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_connection_state::test_mark_disconnected_is_not_connected": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_connection_state::test_mark_reconnecting_is_not_connected": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_connection_state::test_transitions_are_deterministic": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_connection_state::test_transitions_are_idempotent": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_connection_state::test_two_instances_are_independent": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_connector_live_candle_source::test_connector_has_no_subscribe_live_yet": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_connector_live_candle_source::test_live_candle_source_creates_no_reconnect_capability": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_connector_live_candle_source::test_live_candle_source_passes_last_candle_time_seed": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_connector_live_candle_source::test_live_candle_source_returns_candle_source": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_connector_live_candle_source::test_live_candle_source_uses_immutable_slice_config": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_connector_live_candle_source::test_load_historical_still_present_faseA_intact": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_connector_live_candle_source::test_stop_is_safe_noop": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorHistorical::test_api_error_returns_empty_list": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorHistorical::test_candles_sorted_by_timestamp": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorHistorical::test_constructor_stores_parameters": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorHistorical::test_empty_response_returns_empty_list": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorHistorical::test_last_candle_time_none_on_error": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorHistorical::test_last_candle_time_updated_on_success": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorHistorical::test_record_to_candle_conversion": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorHistorical::test_record_to_candle_invalid_record_returns_none": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorHistorical::test_successful_load_returns_candles": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorHistorical::test_timeout_returns_empty_list": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorLiveSubscription::test_is_connected_false_after_stream_ends": {
+      "flaky": false,
+      "result": "failed",
+      "run1": "failed",
+      "run2": "failed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorLiveSubscription::test_is_connected_true_during_live_stream": {
+      "flaky": false,
+      "result": "failed",
+      "run1": "failed",
+      "run2": "failed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorLiveSubscription::test_live_discards_candles_before_last_historical": {
+      "flaky": false,
+      "result": "failed",
+      "run1": "failed",
+      "run2": "failed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorLiveSubscription::test_live_subscription_updates_last_candle_time": {
+      "flaky": false,
+      "result": "failed",
+      "run1": "failed",
+      "run2": "failed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorLiveSubscription::test_live_subscription_yields_candles": {
+      "flaky": false,
+      "result": "failed",
+      "run1": "failed",
+      "run2": "failed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorReconnection::test_auth_failed_stops_retries_immediately": {
+      "flaky": false,
+      "result": "failed",
+      "run1": "failed",
+      "run2": "failed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorReconnection::test_is_connected_false_after_failed_reconnection": {
+      "flaky": false,
+      "result": "failed",
+      "run1": "failed",
+      "run2": "failed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorReconnection::test_live_subscription_triggers_reconnect_on_disconnect": {
+      "flaky": false,
+      "result": "failed",
+      "run1": "failed",
+      "run2": "failed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorReconnection::test_reconnect_retries_up_to_3_times": {
+      "flaky": false,
+      "result": "failed",
+      "run1": "failed",
+      "run2": "failed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorReconnection::test_reconnect_succeeds_on_first_attempt": {
+      "flaky": false,
+      "result": "failed",
+      "run1": "failed",
+      "run2": "failed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorReconnection::test_reconnect_succeeds_on_second_attempt": {
+      "flaky": false,
+      "result": "failed",
+      "run1": "failed",
+      "run2": "failed"
+    },
+    "tests.unit.test_databento_connector.TestDabentoConnectorReconnection::test_reconnect_uses_exponential_backoff": {
+      "flaky": false,
+      "result": "failed",
+      "run1": "failed",
+      "run2": "failed"
+    },
+    "tests.unit.test_databento_connector.TestPriceConversion::test_float_large_value_divided": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestPriceConversion::test_int64_large_value_divided": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestPriceConversion::test_negative_large_value": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestPriceConversion::test_small_float_returned_as_is": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestPriceConversion::test_small_int_returned_as_float": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_databento_connector.TestPriceConversion::test_zero": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_bootstrap_timeout_characterization::test_candles_flow_while_signals_suppressed": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_bootstrap_timeout_characterization::test_late_boundary_lifts_suppression_without_race": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_bootstrap_timeout_characterization::test_permanent_suppression_when_boundary_never_arrives": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_candle_mapper::test_close_converted_correctly": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_candle_mapper::test_high_converted_correctly": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_candle_mapper::test_low_converted_correctly": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_candle_mapper::test_matches_historical_mapping_exactly": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_candle_mapper::test_open_converted_correctly": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_candle_mapper::test_reuses_historical_mapper_without_duplication": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_candle_mapper::test_ts_event_maps_to_interval_open_timestamp": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_candle_mapper::test_valid_record_produces_candle": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_candle_mapper::test_volume_preserved": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_candle_source::test_adapter_reexposes_is_connected": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_candle_source::test_adapter_satisfies_candle_source_protocol": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_candle_source::test_replay_yields_same_candles_as_subscribe_live": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t10_live_loop_end_has_no_simulation_log": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t10_simulation_loop_end_has_simulation_log": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t1_task_done_after_boundary_is_terminal": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t2_task_done_before_boundary_is_terminal": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t3_bootstrapping_within_deadline": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t4_bootstrap_stalled_after_deadline_single_warning": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t5_late_replay_completed_recovers_to_live": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t6_live_ignores_deadline_after_replay_complete": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t7_shutting_down_takes_precedence_over_terminal": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t7b_task_none_is_starting": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t8_settings_none_health_unchanged": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t8_simulation_health_unchanged_task_alive": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t8_simulation_health_unchanged_task_done": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t9_supervisor_cancelled_logs_nothing": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t9_supervisor_during_shutdown_logs_nothing": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t9_supervisor_exception_logs_one_critical": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_pipeline_health::test_t9_supervisor_normal_end_logs_one_critical": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_replay_bootstrap::test_candlesource_output_type_unchanged": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_replay_bootstrap::test_replay_completed_detected_and_not_yielded_as_candle": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_replay_bootstrap::test_replay_completed_event_awaitable": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_replay_bootstrap::test_replay_completed_event_not_set_before_boundary": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_replay_bootstrap::test_replay_start_is_passed_to_subscribe": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_replay_bootstrap::test_replay_start_none_backward_compatible": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_subscription::test_is_connected_false_after_stream_ends": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_subscription::test_is_connected_true_during_live_stream": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_subscription::test_lifecycle_case_a_normal_termination_closes_once": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_subscription::test_lifecycle_case_b_cancellation_closes_once_and_preserves_cancel": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_subscription::test_lifecycle_case_c_stream_exception_closes_once_and_propagates": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_subscription::test_lifecycle_case_d_close_raises_does_not_mask_primary": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_subscription::test_lifecycle_case_e_no_double_close_on_normal_path": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_subscription::test_live_discards_candles_before_last_historical": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_subscription::test_live_subscription_updates_last_candle_time": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_subscription::test_live_subscription_yields_candles": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_subscription::test_reconnect_uses_injected_policy_success": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_live_subscription::test_reconnect_without_policy_raises": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_persistence_repository::test_in_memory_doubles_satisfy_contracts_structurally": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_persistence_repository::test_live_session_get_missing_returns_none": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_persistence_repository::test_live_session_save_and_get": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_persistence_repository::test_signal_context_get_missing_returns_none": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_persistence_repository::test_signal_context_save_and_get": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_persistence_repository::test_signal_context_save_is_idempotent_by_key": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_reconnect_policy::test_auth_failed_equivalent_fatal_zero_retry": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_reconnect_policy::test_config_other_than_1_2_4_not_hardcoded": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_reconnect_policy::test_delays_follow_injected_config": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_reconnect_policy::test_exhaustion_after_n_attempts": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_reconnect_policy::test_exhaustion_transitions_to_disconnected": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_reconnect_policy::test_failure_then_success_on_second_attempt": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_reconnect_policy::test_fatal_before_any_retry_zero_extra_attempts": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_reconnect_policy::test_mvp_config_values": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_reconnect_policy::test_never_attempts_n_plus_one": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_reconnect_policy::test_record_stable_connection_resets_attempts": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_reconnect_policy::test_state_is_reconnecting_during_recovery": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_reconnect_policy::test_success_on_first_attempt": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_reconnect_policy::test_success_on_third_attempt": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_reconnect_policy::test_success_transitions_to_connected": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_risk_gate.TestRiskGateBelowMinContract::test_theoretical_below_one_returns_none_with_reason": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_risk_gate.TestRiskGateFloorConversion::test_floor_conversion_and_risk_cap[0.3-0]": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_risk_gate.TestRiskGateFloorConversion::test_floor_conversion_and_risk_cap[0.5-0]": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_risk_gate.TestRiskGateFloorConversion::test_floor_conversion_and_risk_cap[0.9-0]": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_risk_gate.TestRiskGateFloorConversion::test_floor_conversion_and_risk_cap[1.0-1]": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_risk_gate.TestRiskGateFloorConversion::test_floor_conversion_and_risk_cap[1.2-1]": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_risk_gate.TestRiskGateFloorConversion::test_floor_conversion_and_risk_cap[2.0-2]": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_risk_gate.TestRiskGateFloorConversion::test_floor_conversion_and_risk_cap[2.8-2]": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_risk_gate.TestRiskGateReturnsInteger::test_operable_result_is_int": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_risk_gate.TestRiskGateStopUnavailable::test_stop_pts_none_returns_none_with_reason": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_risk_gate.TestRiskGateStopUnavailable::test_stop_pts_zero_returns_none_with_reason": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_signal_engine.TestSignalEngineBuyCrossover::test_buy_signal_when_fast_crosses_above_slow": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_signal_engine.TestSignalEngineComputeSMA::test_sma_full_list_equals_mean": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_signal_engine.TestSignalEngineComputeSMA::test_sma_matches_manual_calculation": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_signal_engine.TestSignalEngineComputeSMA::test_sma_uses_last_n_values": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_signal_engine.TestSignalEngineNoSignalInsufficientData::test_returns_none_with_1_candle": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_signal_engine.TestSignalEngineNoSignalInsufficientData::test_returns_none_with_20_candles": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_signal_engine.TestSignalEngineNoSignalInsufficientData::test_returns_none_with_zero_candles": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_signal_engine.TestSignalEngineNoSignalNoCross::test_no_signal_when_fast_stays_above_slow": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_signal_engine.TestSignalEngineNoSignalNoCross::test_no_signal_when_fast_stays_below_slow": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_signal_engine.TestSignalEngineSellCrossover::test_sell_signal_when_fast_crosses_below_slow": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_signal_record.TestSignalRecordDiscardedByVolume::test_discarded_by_low_volume_field_values": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_simulation_replay.TestSimulationReplayStopHaltsReplay::test_is_replaying_false_after_stop": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_simulation_replay.TestSimulationReplayStopHaltsReplay::test_stop_halts_replay_after_first_candle": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_simulation_replay.TestSimulationReplayYieldsAtCorrectInterval::test_custom_interval_passed_to_sleep": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_simulation_replay.TestSimulationReplayYieldsAtCorrectInterval::test_empty_candles_yields_nothing": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_simulation_replay.TestSimulationReplayYieldsAtCorrectInterval::test_is_replaying_true_during_replay": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_simulation_replay.TestSimulationReplayYieldsAtCorrectInterval::test_yields_all_candles_with_sleep_between": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_throttled_pusher.TestThrottledPusherCandleAndSignalBatched::test_candle_and_signal_batched_together": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_throttled_pusher.TestThrottledPusherEventAfterInterval::test_event_after_interval_triggers_immediate_push": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_throttled_pusher.TestThrottledPusherNoPushWhenEmpty::test_no_push_when_empty": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_throttled_pusher.TestThrottledPusherThrottleWithinInterval::test_second_flush_within_interval_does_not_send": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_throttled_pusher.TestThrottledPusherTwoRapidEvents::test_two_rapid_queues_produce_single_push": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_volume_filter.TestVolumeFilterBoundary::test_empty_recent_candles_passes": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_volume_filter.TestVolumeFilterBoundary::test_volume_exactly_at_threshold_is_accepted": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    },
+    "tests.unit.test_volume_filter.TestVolumeFilterBoundary::test_volume_one_below_threshold_is_rejected": {
+      "flaky": false,
+      "result": "passed",
+      "run1": "passed",
+      "run2": "passed"
+    }
+  },
+  "total_tests": 406
+}
