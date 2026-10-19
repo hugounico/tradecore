@@ -7,7 +7,7 @@ Validates:
 - RF-03.4: No signal when insufficient data (< 21 candles)
 """
 
-from hypothesis import given, settings, assume
+from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
 from src.engine.signal_engine import SignalEngine
@@ -33,7 +33,9 @@ class TestSMACrossoverSignalCorrectness:
         prev_fast=price_st,
         prev_slow=price_st,
     )
-    @settings(max_examples=100)
+    # assume() descarta la mayoría de los datos al azar (exige un cruce exacto de medias); sin esto
+    # Hypothesis aborta a veces con FailedHealthCheck(filter_too_much) aunque la lógica sea correcta.
+    @settings(max_examples=100, suppress_health_check=[HealthCheck.filter_too_much])
     def test_buy_signal_on_upward_crossover(
         self, closes: list[float], prev_fast: float, prev_slow: float
     ) -> None:
@@ -64,7 +66,9 @@ class TestSMACrossoverSignalCorrectness:
         prev_fast=price_st,
         prev_slow=price_st,
     )
-    @settings(max_examples=100)
+    # assume() descarta la mayoría de los datos al azar (exige un cruce exacto de medias); sin esto
+    # Hypothesis aborta a veces con FailedHealthCheck(filter_too_much) aunque la lógica sea correcta.
+    @settings(max_examples=100, suppress_health_check=[HealthCheck.filter_too_much])
     def test_sell_signal_on_downward_crossover(
         self, closes: list[float], prev_fast: float, prev_slow: float
     ) -> None:
