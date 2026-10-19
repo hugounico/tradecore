@@ -1,12 +1,15 @@
-"""A3c Ola 1 — tests de integración de contrato para `_processing_loop` y `/health`.
+"""A3c Ola 1.1 — tests de integración de contrato para `_processing_loop` y `/health`.
 
-- T8 (VERDE hoy): el `_processing_loop` real, con fuente simulada, suprime señales durante un
-  tramo de replay de recuperación (is_replay_complete=False) pero SÍ alimenta buffer+motor; las
-  señales posteriores coinciden con la referencia continua desde ese punto.
-- T9 (ROJO hoy, por comportamiento): una vela con timestamp <= última aceptada NO debe llegar a
-  `pusher.queue_candle`. Hoy el loop encola la vela aunque el buffer la descarte → aserción falla.
-- T10 (ROJO hoy, por comportamiento): `/health` debe leer `source.phase`: recovering → 200
-  {status ok, phase recovering}; terminal → 503 {phase terminal}. Hoy `/health` no conoce `phase`.
+- T8 (VERDE hoy, reescrito): el `_processing_loop` real, con fuente simulada. Un hueco de 5 velas
+  se recupera mientras is_replay_complete=False; esas velas alimentan buffer+motor pero NO emiten
+  señales. Las señales de la recuperación == señales de la referencia (toda la serie en vivo)
+  EXCLUYENDO solo las del hueco (igualdad de listas completas). La referencia debe tener ≥1 señal
+  antes, ≥1 DENTRO y ≥1 después del hueco (si no, el test reporta la distribución real).
+- T9 (ROJO hoy): una vela con timestamp <= última aceptada NO debe llegar a pusher.queue_candle.
+- T10 (ROJO hoy): /health debe leer source.phase: recovering → 200 {ok, recovering};
+  terminal → 503 {terminal}. Hoy /health no conoce `phase`.
+- T11 (VERDE hoy, nuevo): fuente SIN atributo `phase`, is_replay_complete=True, tarea viva →
+  /health 200 {ok, live}.
 
 Series deterministas construidas DENTRO de cada test (sin archivos externos). No abre red.
 """
@@ -15,6 +18,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import math
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -34,15 +38,21 @@ def _candle(minute: int, close: float) -> Candle:
 
 
 class _RecordingPusher:
+    """Registra cada señal como (índice_vela, timestamp_vela, tipo) y cada vela empujada."""
+
     def __init__(self):
         self.candles = []
-        self.signals = []
+        self.signals = []  # (candle_index, candle_ts, signal_type)
+        self._idx = -1
 
     async def queue_candle(self, candle):
+        self._idx += 1
+        self._last_candle = candle
         self.candles.append(candle)
 
     async def queue_signal(self, signal):
-        self.signals.append(signal)
+        # El índice/timestamp corresponden a la última vela empujada (misma iteración del loop).
+        self.signals.append((self._idx, self._last_candle.timestamp, signal.type.value))
 
     async def queue_sma_update(self, *a, **k):
         pass
@@ -51,8 +61,7 @@ class _RecordingPusher:
 class _ScriptedSource:
     """Fuente CandleSource-like: entrega velas de un guion y controla is_replay_complete.
 
-    `events`: lista de ("candle", Candle) | ("replay_completed",). Permite simular un tramo de
-    replay (suppress on) seguido de la frontera y velas live.
+    `events`: lista de ("candle", Candle) | ("replay_completed",).
     """
 
     def __init__(self, events):
@@ -99,47 +108,79 @@ def _install(source, pusher):
     app_module._replay = source
 
 
-def _rising_then_falling(n_warm=21):
-    """Serie que produce al menos un cruce SMA9/21 tras el warm-up."""
-    closes = [100.0] * n_warm
-    closes += [100.0 + i for i in range(1, 15)]     # subida fuerte -> BUY
-    closes += [114.0 - 2 * i for i in range(1, 15)]  # bajada fuerte -> SELL
+def _oscillating_closes(n=140):
+    """Serie oscilante determinista: varios cruces SMA9/21 repartidos en la serie.
+
+    Oscilación senoidal de periodo ~24 velas sobre 140 velas (tras warm-up de 21) produce
+    múltiples cruces, de modo que haya señales antes, dentro y después de un hueco intermedio.
+    """
+    closes = []
+    for i in range(n):
+        closes.append(100.0 + 8.0 * math.sin(i / 24.0 * 2 * math.pi))
     return closes
 
 
-# --- T8 (VERDE): recuperación durante replay no emite señales; luego continúa igual ---
+# --- T8 (VERDE): recuperación de hueco suprime señales; resto == referencia sin el hueco ---
 
-async def test_t8_recovery_replay_suppressed_then_matches_reference():
-    closes = _rising_then_falling()
+async def test_t8_recovery_gap_suppressed_signals_equal_reference_minus_gap():
+    closes = _oscillating_closes()
     candles = [_candle(i, c) for i, c in enumerate(closes)]
 
-    # Referencia: serie continua SIN supresión (todas live) -> señales de referencia.
+    # Referencia: TODA la serie en vivo (replay_completed primero) -> señales de referencia.
     ref_source = _ScriptedSource([("replay_completed",)] + [("candle", c) for c in candles])
     ref_pusher = _RecordingPusher()
     _install(ref_source, ref_pusher)
     await app_module._processing_loop(suppress_signals=lambda: not ref_source.is_replay_complete)
-    reference_signals = [(s.type.value) for s in ref_pusher.signals]
+    reference = list(ref_pusher.signals)  # [(idx, ts, type), ...]
 
-    # Escenario: un tramo inicial (primeras 25 velas) es REPLAY de recuperación (suppress on),
-    # luego REPLAY_COMPLETED y el resto es live. Las velas del tramo alimentan buffer+motor pero
-    # NO emiten señales; las señales posteriores == referencia desde ese punto.
-    split = 25
-    events = [("candle", c) for c in candles[:split]]
-    events += [("replay_completed",)]
-    events += [("candle", c) for c in candles[split:]]
-    rec_source = _ScriptedSource(events)
+    # Elegir gap_start determinista: la primera señal de referencia con idx >= 30 marca el centro;
+    # colocamos el hueco de 5 velas alrededor de esa señal para garantizar ≥1 señal DENTRO.
+    ref_idxs = [s[0] for s in reference]
+    assert ref_idxs, f"la referencia no produjo señales; distribución real: {reference}"
+    center = next((i for i in ref_idxs if i >= 30), ref_idxs[len(ref_idxs) // 2])
+    gap_start = max(22, center - 2)   # 5 velas: [gap_start, gap_start+5)
+    gap_end = gap_start + 5
+    gap_idxs = set(range(gap_start, gap_end))
+
+    before = [s for s in reference if s[0] < gap_start]
+    inside = [s for s in reference if gap_start <= s[0] < gap_end]
+    after = [s for s in reference if s[0] >= gap_end]
+    assert before and inside and after, (
+        "la referencia debe tener señales antes, dentro y después del hueco; "
+        f"antes={len(before)} dentro={len(inside)} despues={len(after)}; "
+        f"gap=[{gap_start},{gap_end}); señales={reference}"
+    )
+
+    # Recuperación: velas [0,gap_start) en vivo; luego is_replay_complete=False para el hueco
+    # [gap_start,gap_end); replay_completed; resto en vivo.
+    events = [("replay_completed",)]                                   # arranque: live
+    events += [("candle", c) for c in candles[:gap_start]]             # live antes del hueco
+    # entrar en recuperación: la fuente deja de estar "completa" para el tramo del hueco
+    events += [("__uncomplete__",)]
+    events += [("candle", c) for c in candles[gap_start:gap_end]]      # hueco (suppress on)
+    events += [("replay_completed",)]                                  # recuperación completa
+    events += [("candle", c) for c in candles[gap_end:]]              # live después del hueco
+
+    class _GapSource(_ScriptedSource):
+        async def replay(self):
+            for ev in self._events:
+                if ev[0] == "replay_completed":
+                    self.is_replay_complete = True
+                elif ev[0] == "__uncomplete__":
+                    self.is_replay_complete = False
+                else:
+                    yield ev[1]
+
+    rec_source = _GapSource(events)
     rec_pusher = _RecordingPusher()
     _install(rec_source, rec_pusher)
     await app_module._processing_loop(suppress_signals=lambda: not rec_source.is_replay_complete)
 
-    # El buffer/motor recibió TODAS las velas (alimentación no suprimida).
+    # Todas las velas alimentaron buffer+motor.
     assert len(rec_pusher.candles) == len(candles)
-    # Durante el tramo de replay (suppress on) no se emitió ninguna señal cuyo cruce cayera ahí:
-    # todas las señales emitidas corresponden a cruces ocurridos DESPUÉS del split.
-    # Y el motor, al estar caliente, produce desde el split las mismas señales que la referencia
-    # tiene desde ese punto.
-    ref_after = reference_signals[-len(rec_pusher.signals):] if rec_pusher.signals else []
-    assert [s.type.value for s in rec_pusher.signals] == ref_after
+    # Igualdad de listas completas: recuperación == referencia excluyendo SOLO las señales del hueco.
+    expected = [s for s in reference if s[0] not in gap_idxs]
+    assert rec_pusher.signals == expected
 
 
 # --- T9 (ROJO): una vela <= última aceptada NO debe llegar a queue_candle ---
@@ -158,8 +199,6 @@ async def test_t9_duplicate_candle_not_pushed():
     _install(source, pusher)
     await app_module._processing_loop(suppress_signals=lambda: not source.is_replay_complete)
 
-    # El buffer sólo aceptó c1,c2,c3. La vela duplicada (dup, timestamp <= última) NO debe
-    # haberse enviado al pusher. Hoy el loop encola SIEMPRE -> esta aserción falla (ROJO).
     pushed_ts = [c.timestamp for c in pusher.candles]
     assert pushed_ts == [c1.timestamp, c2.timestamp, c3.timestamp]
 
@@ -167,11 +206,9 @@ async def test_t9_duplicate_candle_not_pushed():
 # --- T10 (ROJO): /health lee source.phase (recovering/terminal) ---
 
 class _PhaseSource:
-    """Fuente que solo expone `phase` (y stop) para el contrato nuevo de /health."""
-
     def __init__(self, phase):
         self.phase = phase
-        self.is_replay_complete = True  # irrelevante para el contrato nuevo
+        self.is_replay_complete = True
 
     def stop(self):
         pass
@@ -196,23 +233,44 @@ async def _health():
     return resp.status_code, body
 
 
-async def test_t10_health_reads_source_phase_recovering_and_terminal():
+def _install_health(source):
     import time as _time
-    # recovering -> 200 {status ok, phase recovering}
     app_module._settings = _S()
     app_module._pipeline_task = _AliveTask()
     app_module._shutdown_in_progress = False
     app_module._stall_warning_logged = False
     app_module._live_bootstrap_started_at = _time.monotonic()
-    app_module._replay = _PhaseSource("recovering")
+    app_module._replay = source
 
+
+async def test_t10_health_reads_source_phase_recovering_and_terminal():
+    _install_health(_PhaseSource("recovering"))
     code, body = await _health()
     assert code == 200
     assert body.get("status") == "ok"
     assert body.get("phase") == "recovering"
 
-    # terminal -> 503 {phase terminal}
     app_module._replay = _PhaseSource("terminal")
     code, body = await _health()
     assert code == 503
     assert body.get("phase") == "terminal"
+
+
+# --- T11 (VERDE): fuente sin `phase`, replay completo, tarea viva -> 200 live ---
+
+class _NoPhaseSource:
+    """Fuente que NO tiene atributo `phase` (como la fuente actual). is_replay_complete=True."""
+
+    def __init__(self):
+        self.is_replay_complete = True
+
+    def stop(self):
+        pass
+
+
+async def test_t11_health_source_without_phase_is_live():
+    _install_health(_NoPhaseSource())
+    code, body = await _health()
+    assert code == 200
+    assert body.get("status") == "ok"
+    assert body.get("phase") == "live"

@@ -1,25 +1,34 @@
-"""A3c Ola 1 — tests de aceptación de `RecoveringLiveSource` (Ola 2 lo implementa).
+"""A3c Ola 1.1 — tests de aceptación de `RecoveringLiveSource` (Ola 2 lo implementa).
 
-Estos tests ESPECIFICAN el comportamiento del supervisor de recuperación Databento que
+ESPECIFICAN el comportamiento del supervisor de recuperación Databento que
 `src/live/recovering_live_source.py` (clase `RecoveringLiveSource`) debe cumplir. La clase
-NO existe todavía: por eso `RecoveringLiveSource` se importa DENTRO de cada test, de modo que
-hoy fallen con `ModuleNotFoundError` (ROJO esperado) y no rompan la colección del archivo.
+NO existe todavía: `RecoveringLiveSource` se importa DENTRO de cada test, de modo que hoy
+fallen con `ModuleNotFoundError` (ROJO esperado) sin romper la colección del archivo.
 
-Los fakes de este módulo SOLO simulan:
-  - la fuente Databento (una "sesión": registra su `start`, el orden de eventos que emite,
-    cuántas sesiones hay activas a la vez, el máximo, y las llamadas a `stop()`);
-  - el reloj (`now()`) y la espera (`sleep(seg)`).
-NO reimplementan la lógica de recuperación (eso es la Ola 2).
+Reglas del contrato (aclaraciones vinculantes Ola 1.1):
+  R1. Un fin de stream DESPUÉS de haber entregado velas abre una recuperación; nunca es fin
+      exitoso de replay().
+  R2. Cerrar el consumidor (aclose del generador de replay()) NO es desconexión: detiene la
+      sesión actual y termina sin crear sesiones nuevas.
+  R3. Toda sesión que termina (arranque, recuperación o respaldo) recibe stop() ANTES de que la
+      siguiente inicie su replay.
+  R4. El plazo de 30 min se evalúa DESPUÉS de cada espera y ANTES de abrir el intento.
 
-Contrato de inyección asumido (mínimo, decidido aquí):
+Contrato de inyección asumido (mínimo):
     RecoveringLiveSource(make_source=..., sleep=..., now=..., config=...)
-  - `make_source(start)`: fábrica que crea una nueva sesión/fuente con `start` = datetime o el
-    entero 0. Devuelve un objeto con `replay()` (async iterator de Candle), `stop()`,
-    `is_replay_complete` y `replay_completed_event` (asyncio.Event).
-  - `sleep(seg)`: corutina de espera inyectable.
-  - `now()`: devuelve el datetime "actual" (reloj inyectable).
-  - `config`: esperas de recuperación, LOOKBACK y plazo terminal.
-Expone: `phase`, `is_replay_complete`, `recovering_since` y `replay()` (CandleSource).
+  - make_source(start): fábrica de sesión con start = datetime o el entero 0. Devuelve objeto
+    con replay() (async iterator de Candle), stop(), is_replay_complete, replay_completed_event.
+  - sleep(seg): corutina de espera inyectable.  now(): datetime "actual" inyectable.
+  - config: lookback, recovery_delays_seconds, terminal_after.
+Expone: phase, is_replay_complete, recovering_since, replay() (CandleSource).
+
+ARNÉS:
+  - Evento ("hold",): sesión sana que queda abierta (await de un Event que nunca se activa).
+    Toda sesión que deba quedar en vivo termina en ("hold",), nunca en ("end",).
+  - take(src, n): agen = src.replay() UNA vez; n anext; en finally await agen.aclose().
+  - Registro ordenado de eventos: ("make",id,start),("replay_start",id,start),
+    ("stop",id,start),("replay_end",id,start).
+  - El sleep falso registra (segundos, phase, is_replay_complete, recovering_since).
 """
 
 from __future__ import annotations
@@ -31,7 +40,6 @@ import pytest
 
 from src.schemas.candle import Candle
 
-# Reloj base fijo para todos los tests (determinista, tz-aware UTC).
 T0 = datetime(2026, 10, 16, 13, 30, 0, tzinfo=timezone.utc)
 LOOKBACK = timedelta(minutes=90)
 MINUTE = timedelta(minutes=1)
@@ -44,12 +52,18 @@ def _candle(ts: datetime, close: float = 100.0) -> Candle:
 # --- Infraestructura de fakes (solo simulan la fuente/reloj/sleep) -----------
 
 class _FakeClock:
-    """Reloj inyectable. `advance()` lo mueve; `sleep()` opcionalmente avanza el reloj."""
+    """Reloj + sleep inyectables. El sleep falso registra el estado del supervisor."""
 
     def __init__(self, start: datetime, sleep_advances: bool = False):
         self._t = start
-        self.sleeps: list[float] = []
         self._sleep_advances = sleep_advances
+        self.sleeps: list[float] = []
+        # Observaciones ricas en cada sleep: (segundos, phase, is_replay_complete, recovering_since)
+        self.observations: list[tuple] = []
+        self._src = None  # se liga tras crear el supervisor
+
+    def bind(self, src) -> None:
+        self._src = src
 
     def now(self) -> datetime:
         return self._t
@@ -59,20 +73,27 @@ class _FakeClock:
 
     async def sleep(self, seconds: float) -> None:
         self.sleeps.append(seconds)
+        if self._src is not None:
+            self.observations.append(
+                (seconds, self._src.phase, self._src.is_replay_complete, self._src.recovering_since)
+            )
         if self._sleep_advances:
             self.advance(seconds)
 
 
 class _FakeSession:
-    """Una sesión Databento simulada: emite un guion de eventos vía replay().
+    """Sesión Databento simulada por un guion de eventos vía replay().
 
-    `script` es una lista de eventos:
-      ("candle", Candle)      -> entrega una vela
-      ("replay_completed",)   -> marca is_replay_complete (frontera REPLAY->LIVE)
-      ("end",)                -> el stream termina limpio (fin del async for)
-      ("raise", Exception)    -> el stream termina por excepción
-    Registra en el `registry` compartido: el start pedido, stop_calls, sesiones activas y máximo.
+    Eventos:
+      ("candle", Candle)    -> entrega una vela
+      ("replay_completed",) -> marca is_replay_complete (frontera REPLAY->LIVE)
+      ("end",)              -> fin limpio del stream (fin del async for)
+      ("raise", Exception)  -> fin por excepción
+      ("hold",)             -> sesión sana que queda abierta (await de un Event que nunca se activa)
+    Escribe eventos ordenados en el log compartido y mantiene el conteo de sesiones activas.
     """
+
+    _next_id = 0
 
     def __init__(self, start, script, registry):
         self.start = start
@@ -81,9 +102,14 @@ class _FakeSession:
         self.is_replay_complete = False
         self.replay_completed_event = asyncio.Event()
         self.stopped = False
+        _FakeSession._next_id += 1
+        self.id = _FakeSession._next_id
+        self._hold_gate = asyncio.Event()  # nunca se activa -> "hold" bloquea hasta cancelación
         registry["starts"].append(start)
+        registry["events"].append(("make", self.id, start))
 
     async def replay(self):
+        self._registry["events"].append(("replay_start", self.id, self.start))
         self._registry["active"] += 1
         self._registry["max_active"] = max(self._registry["max_active"], self._registry["active"])
         try:
@@ -98,28 +124,29 @@ class _FakeSession:
                     return
                 elif kind == "raise":
                     raise ev[1]
-                else:  # pragma: no cover - guion inválido
+                elif kind == "hold":
+                    # Sesión viva: espera indefinidamente (hasta que el consumidor haga aclose,
+                    # que cancela este await). No termina por sí sola.
+                    await self._hold_gate.wait()
+                else:  # pragma: no cover
                     raise AssertionError(f"evento desconocido: {kind}")
-            # fin natural del guion == fin limpio del stream
         finally:
             self._registry["active"] -= 1
+            self._registry["events"].append(("replay_end", self.id, self.start))
 
     def stop(self):
         self.stopped = True
-        self._registry["stop_calls"].append(self.start)
+        self._hold_gate.set()  # libera un "hold" si lo hubiera
+        self._registry["events"].append(("stop", self.id, self.start))
 
 
 class _ScriptedFactory:
-    """`make_source(start)` que devuelve sesiones según una cola de guiones.
-
-    `scripts` es una lista de guiones (uno por sesión, en orden de creación). El registry
-    comparte starts/stop_calls/active/max_active entre todas las sesiones creadas.
-    """
+    """make_source(start) que entrega sesiones según una cola de guiones (en orden de creación)."""
 
     def __init__(self, scripts):
         self._scripts = list(scripts)
         self._i = 0
-        self.registry = {"starts": [], "stop_calls": [], "active": 0, "max_active": 0}
+        self.registry = {"starts": [], "events": [], "active": 0, "max_active": 0}
         self.sessions: list[_FakeSession] = []
 
     def __call__(self, start):
@@ -137,10 +164,15 @@ class _ScriptedFactory:
     def call_count(self) -> int:
         return self._i
 
+    # --- helpers de orden sobre el log de eventos ---
+    def _first_index(self, kind, sess_id):
+        for idx, ev in enumerate(self.registry["events"]):
+            if ev[0] == kind and ev[1] == sess_id:
+                return idx
+        raise AssertionError(f"evento {kind} de sesión {sess_id} no registrado")
+
 
 def _make_config(**overrides):
-    """Config mínima de recuperación. Los valores del contrato: esperas 1,2,4,8,16,30,60;
-    LOOKBACK 90 min; plazo terminal 30 min. Se pasan como configuración, no hardcode."""
     cfg = {
         "lookback": LOOKBACK,
         "recovery_delays_seconds": [1, 2, 4, 8, 16, 30, 60],
@@ -150,10 +182,30 @@ def _make_config(**overrides):
     return cfg
 
 
-async def _drain(source):
-    """Consume source.replay() hasta el final, devolviendo las velas entregadas."""
+def _new(factory, clock, cfg=None):
+    from src.live.recovering_live_source import RecoveringLiveSource
+    src = RecoveringLiveSource(
+        make_source=factory, sleep=clock.sleep, now=clock.now, config=cfg or _make_config()
+    )
+    clock.bind(src)
+    return src
+
+
+async def take(src, n):
+    """Consume exactamente n velas de un único replay(); cierra el generador en finally (R2)."""
+    agen = src.replay()
     out = []
-    async for c in source.replay():
+    try:
+        for _ in range(n):
+            out.append(await agen.__anext__())
+    finally:
+        await agen.aclose()
+    return out
+
+
+async def _drain(src):
+    out = []
+    async for c in src.replay():
         out.append(c)
     return out
 
@@ -161,220 +213,213 @@ async def _drain(source):
 # ============================ TESTS ========================================
 
 async def test_t1_startup_backup_start_zero_then_live():
-    """T1 arranque: primario (start=now-90m) termina sin datos → respaldo start=0 entrega y
-    completa el replay. starts == [now-90m, 0]; phase == 'live'."""
-    from src.live.recovering_live_source import RecoveringLiveSource
+    """T1: primario sin datos → respaldo start=0 [r1, replay_completed, live1, hold]; take 2."""
+    from src.live.recovering_live_source import RecoveringLiveSource  # noqa: F401 (import ROJO hoy)
 
     clock = _FakeClock(T0)
+    r1 = _candle(T0 - 30 * MINUTE)   # vela del replay (antes del completed)
+    live1 = _candle(T0 - 1 * MINUTE)
     factory = _ScriptedFactory([
-        # primario: termina sin entregar vela
-        [("end",)],
-        # respaldo start=0: entrega una vela y completa replay
-        [("candle", _candle(T0)), ("replay_completed",), ("end",)],
+        [("end",)],  # primario: termina sin entregar vela
+        [("candle", r1), ("replay_completed",), ("candle", live1), ("hold",)],  # respaldo
     ])
-    src = RecoveringLiveSource(
-        make_source=factory, sleep=clock.sleep, now=clock.now, config=_make_config()
-    )
-    candles = await _drain(src)
+    src = _new(factory, clock)
+
+    got = await take(src, 2)
 
     assert factory.registry["starts"] == [T0 - LOOKBACK, 0]
-    assert len(candles) == 1
+    assert [c.timestamp for c in got] == [r1.timestamp, live1.timestamp]
+    # stop(primario) ocurre antes de replay_start(respaldo)
+    primario, respaldo = factory.sessions[0], factory.sessions[1]
+    assert factory._first_index("stop", primario.id) < factory._first_index("replay_start", respaldo.id)
     assert src.phase == "live"
     assert src.is_replay_complete is True
+    # Tras aclose: no se crearon más sesiones y el respaldo quedó detenido (R2).
+    assert factory.call_count == 2
+    assert factory.sessions[1].stopped is True
 
 
 async def test_t2_startup_both_fail_is_terminal():
-    """T2 arranque terminal: primario y respaldo terminan sin datos → exactamente 2 fuentes,
-    phase 'terminal', replay() termina."""
-    from src.live.recovering_live_source import RecoveringLiveSource
+    """T2 arranque terminal: primario y respaldo sin datos → 2 fuentes, terminal, replay() termina."""
+    from src.live.recovering_live_source import RecoveringLiveSource  # noqa: F401
 
     clock = _FakeClock(T0)
     factory = _ScriptedFactory([
-        [("end",)],        # primario sin datos
-        [("raise", RuntimeError("backup boom"))],  # respaldo sin datos
+        [("end",)],
+        [("raise", RuntimeError("backup boom"))],
     ])
-    src = RecoveringLiveSource(
-        make_source=factory, sleep=clock.sleep, now=clock.now, config=_make_config()
-    )
+    src = _new(factory, clock)
     candles = await _drain(src)
 
+    assert candles == []
+    assert factory.registry["starts"] == [T0 - LOOKBACK, 0]
     assert factory.call_count == 2
     assert src.phase == "terminal"
-    assert candles == []
 
 
 async def test_t3_live_timeout_recovers_and_returns_to_live():
-    """T3 timeout en vivo: tras entregar velas, la sesión cae → recovering (is_replay_complete
-    False), stop de la vieja ANTES de iniciar la nueva, start = última + 1 min, hueco entregado
-    una vez y en orden, max_active_sessions == 1, vuelve a live/True."""
-    from src.live.recovering_live_source import RecoveringLiveSource
+    """T3 timeout en vivo: cae tras entregar c1,c2 → recovering; recuperación entrega el hueco."""
+    from src.live.recovering_live_source import RecoveringLiveSource  # noqa: F401
 
     c1 = _candle(T0 + 0 * MINUTE)
     c2 = _candle(T0 + 1 * MINUTE)
-    # hueco: velas posteriores a c2
     g1 = _candle(T0 + 2 * MINUTE)
     g2 = _candle(T0 + 3 * MINUTE)
+    live1 = _candle(T0 + 4 * MINUTE)
 
     clock = _FakeClock(T0, sleep_advances=True)
     factory = _ScriptedFactory([
-        # sesión inicial: completa replay, entrega c1,c2, luego cae por excepción
-        [("replay_completed",), ("candle", c1), ("candle", c2), ("raise", ConnectionError("drop"))],
-        # recuperación: completa replay y entrega el hueco
-        [("replay_completed",), ("candle", g1), ("candle", g2), ("end",)],
+        [("replay_completed",), ("candle", c1), ("candle", c2), ("raise", ConnectionError("Gateway timeout"))],
+        [("candle", g1), ("candle", g2), ("replay_completed",), ("candle", live1), ("hold",)],
     ])
+    src = _new(factory, clock)
 
-    phase_during_recovery = {}
+    got = await take(src, 5)
 
-    cfg = _make_config()
-    src = RecoveringLiveSource(
-        make_source=factory, sleep=clock.sleep, now=clock.now, config=cfg
-    )
-    candles = await _drain(src)
-
-    # Entregó c1,c2 y el hueco g1,g2 (estrictamente crecientes, una sola vez cada una)
-    assert [c.timestamp for c in candles] == [c1.timestamp, c2.timestamp, g1.timestamp, g2.timestamp]
-    # La sesión de recuperación pidió start = última entregada (c2) + 1 min
+    assert [c.timestamp for c in got] == [c1.timestamp, c2.timestamp, g1.timestamp, g2.timestamp, live1.timestamp]
     assert factory.registry["starts"][1] == c2.timestamp + MINUTE
-    # Nunca hubo 2 sesiones activas a la vez; la vieja se cerró
+    # Observación en el sleep de recuperación: recovering, replay NO completo, recovering_since != None
+    assert clock.observations, "debió haber al menos un sleep de recuperación"
+    secs, phase, complete, since = clock.observations[0]
+    assert phase == "recovering"
+    assert complete is False
+    assert since is not None
+    # stop(inicial) < replay_start(recuperación)
+    ini, rec = factory.sessions[0], factory.sessions[1]
+    assert factory._first_index("stop", ini.id) < factory._first_index("replay_start", rec.id)
     assert factory.registry["max_active"] == 1
-    assert factory.sessions[0].stopped is True
-    # stop de la vieja ocurre ANTES de registrar el start de la nueva
-    assert factory.registry["stop_calls"] == [factory.sessions[0].start]
-    # Terminó en live con replay completo
     assert src.phase == "live"
     assert src.is_replay_complete is True
     assert src.recovering_since is None
+    # Tras aclose: ninguna sesión nueva más allá de las 2 guionadas.
+    assert factory.call_count == 2
 
 
 async def test_t4_clean_end_five_failed_attempts_then_live():
-    """T4: fin limpio tras entregar velas + 5 intentos de recuperación que terminan antes de su
-    REPLAY_COMPLETED, luego uno exitoso. sleeps == [1,2,4,8,16] antes de cada intento;
-    recovering_since constante durante toda la recuperación; termina en live."""
-    from src.live.recovering_live_source import RecoveringLiveSource
+    """T4 fin limpio + 5 intentos fallidos (primario+respaldo c/u) + 6º primario exitoso."""
+    from src.live.recovering_live_source import RecoveringLiveSource  # noqa: F401
 
     c1 = _candle(T0)
-    clock = _FakeClock(T0, sleep_advances=False)  # el reloj NO avanza con sleep en este test
-    factory = _ScriptedFactory([
-        # inicial: completa, entrega 1 vela, luego FIN LIMPIO (stream agotado)
-        [("replay_completed",), ("candle", c1), ("end",)],
-        # intentos 1..5: terminan ANTES de su replay_completed (sin datos nuevos)
-        [("end",)],
-        [("raise", ConnectionError("x"))],
-        [("end",)],
-        [("raise", ConnectionError("x"))],
-        [("end",)],
-        # intento 6: completa replay → vuelve a live
-        [("replay_completed",), ("end",)],
-    ])
-    src = RecoveringLiveSource(
-        make_source=factory, sleep=clock.sleep, now=clock.now, config=_make_config()
-    )
+    g1 = _candle(T0 + 1 * MINUTE)
+    live1 = _candle(T0 + 2 * MINUTE)
+    clock = _FakeClock(T0, sleep_advances=True)
+    scripts = [
+        [("replay_completed",), ("candle", c1), ("end",)],  # inicial: fin limpio TRAS entregar (R1 => recovering)
+    ]
+    # 5 intentos fallidos: cada uno primario sin datos + respaldo sin datos = 10 sesiones
+    for _ in range(5):
+        scripts.append([("end",)])   # primario del intento, sin datos
+        scripts.append([("end",)])   # respaldo start=0 del intento, sin datos
+    # 6º intento: primario entrega + completa + live + hold
+    scripts.append([("candle", g1), ("replay_completed",), ("candle", live1), ("hold",)])
+    factory = _ScriptedFactory(scripts)
+    src = _new(factory, clock)
 
-    recovering_since_seen = []
-    # envoltura para observar recovering_since durante el drain no es trivial; se valida al final
-    await _drain(src)
+    got = await take(src, 3)  # c1 (inicial) + g1 + live1 (6º intento)
 
-    # Las esperas de los primeros 5 intentos de recuperación (antes de cada intento).
-    assert clock.sleeps[:5] == [1, 2, 4, 8, 16]
+    assert [c.timestamp for c in got] == [c1.timestamp, g1.timestamp, live1.timestamp]
+    assert factory.call_count == 12
+    expected_starts = [T0 - LOOKBACK] + [c1.timestamp + MINUTE, 0] * 5 + [c1.timestamp + MINUTE]
+    assert factory.registry["starts"] == expected_starts
+    assert clock.sleeps == [1, 2, 4, 8, 16, 30]
+    # En todos los sleeps: recovering, replay NO completo, y el MISMO recovering_since.
+    since_values = {obs[3] for obs in clock.observations}
+    assert all(obs[1] == "recovering" for obs in clock.observations)
+    assert all(obs[2] is False for obs in clock.observations)
+    assert len(since_values) == 1 and None not in since_values
     assert src.phase == "live"
     assert src.recovering_since is None
 
 
 async def test_t5_deadline_reaches_terminal_no_more_sessions():
-    """T5 plazo: el reloj falso alcanza 30 min desde recovering_since → terminal y no se abren
-    más sesiones (el plazo se evalúa ANTES de cada intento)."""
-    from src.live.recovering_live_source import RecoveringLiveSource
+    """T5 plazo: esperas [600]×n, plazo 30 min → sleeps [600,600,600], call_count 5, terminal."""
+    from src.live.recovering_live_source import RecoveringLiveSource  # noqa: F401
 
     c1 = _candle(T0)
-    # sleep avanza el reloj; con esperas 1,2,4,8,16,30,60 la suma supera 30 min (1800s) pronto
-    # tras bastantes intentos; forzamos plazo corto para determinismo: terminal_after pequeño.
     clock = _FakeClock(T0, sleep_advances=True)
-    # Todos los intentos de recuperación fallan sin completar; nunca vuelve a live.
     scripts = [
         [("replay_completed",), ("candle", c1), ("raise", ConnectionError("drop"))],  # inicial
-    ] + [[("end",)] for _ in range(50)]  # muchos intentos fallidos disponibles
+    ] + [[("end",)] for _ in range(50)]  # intentos fallidos disponibles de sobra
     factory = _ScriptedFactory(scripts)
-    cfg = _make_config(
-        # esperas que, acumuladas, cruzan el plazo; plazo 30 min del contrato.
-        recovery_delays_seconds=[600, 600, 600, 600, 600, 600],
-        terminal_after=timedelta(minutes=30),
-    )
-    src = RecoveringLiveSource(
-        make_source=factory, sleep=clock.sleep, now=clock.now, config=cfg
-    )
+    cfg = _make_config(recovery_delays_seconds=[600], terminal_after=timedelta(minutes=30))
+    src = _new(factory, clock, cfg)
+
     await _drain(src)
 
+    # Esperas de 600s: tras la 3ª (1800s) el reloj cruza el plazo y antes del 4º intento -> terminal.
+    assert clock.sleeps == [600, 600, 600]
+    # inicial + 4 sesiones de recuperación abiertas (las 3 que durmieron+abrieron y se evalúa el
+    # plazo ANTES del 4º): call_count == 5.
+    assert factory.call_count == 5
+    since_values = {obs[3] for obs in clock.observations}
+    assert len(since_values) == 1 and None not in since_values
     assert src.phase == "terminal"
-    # Se abrió la inicial + algunos intentos, pero NO las 50; al cruzar el plazo deja de abrir.
-    assert factory.call_count < len(scripts)
 
 
 async def test_t6_gap_rejected_only_newer_than_last():
-    """T6 hueco rechazado: el primario de recuperación falla sin datos → respaldo start=0 entrega
-    solape + hueco; solo salen velas con timestamp > última entregada."""
-    from src.live.recovering_live_source import RecoveringLiveSource
+    """T6 hueco rechazado: recuperación primaria sin datos → respaldo start=0 reenvía solape+hueco."""
+    from src.live.recovering_live_source import RecoveringLiveSource  # noqa: F401
 
     c1 = _candle(T0 + 0 * MINUTE)
     c2 = _candle(T0 + 1 * MINUTE)   # última entregada antes del corte
-    # respaldo start=0 reenvía desde el principio: c1,c2 (solape, <=) y luego g (hueco, >)
-    g = _candle(T0 + 2 * MINUTE)
+    g1 = _candle(T0 + 2 * MINUTE)
+    g2 = _candle(T0 + 3 * MINUTE)
+    live1 = _candle(T0 + 4 * MINUTE)
 
     clock = _FakeClock(T0, sleep_advances=True)
     factory = _ScriptedFactory([
-        # inicial: completa, entrega c1,c2, cae
         [("replay_completed",), ("candle", c1), ("candle", c2), ("raise", ConnectionError("drop"))],
-        # recuperación primaria (start=c2+1m): termina sin entregar vela
-        [("end",)],
-        # respaldo start=0: reenvía c1,c2 (solape) + completa + g (hueco)
-        [("replay_completed",), ("candle", c1), ("candle", c2), ("candle", g), ("end",)],
+        [("end",)],  # recuperación primaria (start=c2+1m) sin datos
+        # respaldo start=0: reenvía c1,c2 (solape, <=) + g1,g2 (hueco, >) + completa + live + hold
+        [("candle", c1), ("candle", c2), ("candle", g1), ("candle", g2), ("replay_completed",), ("candle", live1), ("hold",)],
     ])
-    src = RecoveringLiveSource(
-        make_source=factory, sleep=clock.sleep, now=clock.now, config=_make_config()
-    )
-    candles = await _drain(src)
+    src = _new(factory, clock)
 
-    # Solape (c1,c2) descartado en la recuperación; solo sale el hueco g una vez.
-    assert [c.timestamp for c in candles] == [c1.timestamp, c2.timestamp, g.timestamp]
-    # El respaldo del intento de recuperación pidió start=0
-    assert 0 in factory.registry["starts"]
+    got = await take(src, 5)  # c1,c2 (iniciales) + g1,g2 (hueco) + live1
+
+    assert [c.timestamp for c in got] == [c1.timestamp, c2.timestamp, g1.timestamp, g2.timestamp, live1.timestamp]
+    assert factory.registry["starts"] == [T0 - LOOKBACK, c2.timestamp + MINUTE, 0]
+    # Durante la entrega de g1/g2 (replay del respaldo) is_replay_complete era False: lo validamos
+    # indirectamente por el orden del guion (replay_completed llega DESPUÉS de g2) y por el estado
+    # final. No hay sleep entre g1/g2; el estado durante el replay se refleja en que live1 llega
+    # ya con replay completo.
     assert src.phase == "live"
+    assert src.is_replay_complete is True
 
 
 async def test_t7_is_replay_complete_rearm_sequence():
-    """T7 re-armado de is_replay_complete:
-    False (bootstrapping) → True (REPLAY_COMPLETED inicial) → corte → False (recovering) →
-    False durante el replay de recuperación → True (REPLAY_COMPLETED de la recuperación)."""
-    from src.live.recovering_live_source import RecoveringLiveSource
+    """T7 re-armado observando con anext: bootstrapping/False → live/True (1ª live) →
+    recovering/False (g1) → live/True (live1). Termina en hold."""
+    from src.live.recovering_live_source import RecoveringLiveSource  # noqa: F401
 
-    c1 = _candle(T0)
-    g1 = _candle(T0 + 1 * MINUTE)
-    seen: list[tuple[str, bool]] = []
+    live_ini = _candle(T0 + 0 * MINUTE)   # 1ª vela live tras REPLAY_COMPLETED inicial
+    g1 = _candle(T0 + 1 * MINUTE)         # vela de recuperación ANTES de su replay_completed
+    live1 = _candle(T0 + 2 * MINUTE)      # live tras replay_completed de recuperación
 
     clock = _FakeClock(T0, sleep_advances=True)
-
-    # Guiones con "probes" implícitos: observamos is_replay_complete en puntos clave vía un
-    # wrapper que registra el flag después de cada vela entregada por el supervisor.
     factory = _ScriptedFactory([
-        [("replay_completed",), ("candle", c1), ("raise", ConnectionError("drop"))],
-        [("candle", g1), ("replay_completed",), ("end",)],  # vela ANTES de completar: no debe marcar True
+        [("replay_completed",), ("candle", live_ini), ("raise", ConnectionError("drop"))],
+        [("candle", g1), ("replay_completed",), ("candle", live1), ("hold",)],
     ])
-    src = RecoveringLiveSource(
-        make_source=factory, sleep=clock.sleep, now=clock.now, config=_make_config()
-    )
+    src = _new(factory, clock)
 
-    # Estado inicial antes de consumir: bootstrapping, flag False.
+    # Estado inicial antes de consumir.
+    assert src.phase == "bootstrapping"
     assert src.is_replay_complete is False
 
-    out = []
     agen = src.replay()
-    async for c in agen:
-        out.append(c)
-        seen.append((("c1" if c.timestamp == c1.timestamp else "g1"), src.is_replay_complete))
+    try:
+        c_live_ini = await agen.__anext__()
+        assert c_live_ini.timestamp == live_ini.timestamp
+        assert src.phase == "live" and src.is_replay_complete is True
 
-    # Tras c1 (post REPLAY_COMPLETED inicial) el flag estaba True;
-    # g1 llega ANTES del REPLAY_COMPLETED de recuperación → en ese punto el flag debe ser False
-    # (una vela NO marca replay completo).
-    assert ("c1", True) in seen
-    assert ("g1", False) in seen
-    # Al final, el REPLAY_COMPLETED de la recuperación deja el flag en True.
-    assert src.is_replay_complete is True
+        c_g1 = await agen.__anext__()
+        assert c_g1.timestamp == g1.timestamp
+        # g1 llega durante el replay de recuperación, ANTES de su replay_completed.
+        assert src.phase == "recovering" and src.is_replay_complete is False
+
+        c_live1 = await agen.__anext__()
+        assert c_live1.timestamp == live1.timestamp
+        assert src.phase == "live" and src.is_replay_complete is True
+    finally:
+        await agen.aclose()
