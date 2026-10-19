@@ -606,3 +606,203 @@ async def test_t13_inner_stream_closed_on_cut_and_on_external_aclose():
     assert new.stopped is True
     assert ("replay_end", new.id, new.start) in factory.registry["events"]
     assert factory.call_count == 2  # no se creó ninguna sesión adicional
+
+
+
+# ============================ TESTS Ola 2.1 (T14–T19) =====================
+
+async def test_t14_consumer_cancelled_while_session_holds():
+    """T14: cancelar la tarea consumidora con la sesión esperando ('hold') → CancelledError se
+    propaga, la sesión actual recibe stop() y replay_end, y NO se abre otra sesión."""
+    from src.live.recovering_live_source import RecoveringLiveSource
+
+    c1 = _candle(T0)
+    clock = _FakeClock(T0, sleep_advances=True)
+    factory = _InertStopFactory([[("replay_completed",), ("candle", c1), ("hold",)]] + [[("hold",)]] * 3)
+    src = RecoveringLiveSource(make_source=factory, sleep=clock.sleep, now=clock.now, config=_make_config())
+    clock.bind(src)
+    got = []
+
+    async def consume():
+        async for c in src.replay():
+            got.append(c)
+
+    task = asyncio.create_task(consume())
+    for _ in range(50):
+        if got:
+            break
+        await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert [c.timestamp for c in got] == [c1.timestamp]
+    task.cancel()
+    done, _ = await asyncio.wait({task}, timeout=2)
+    assert task in done, "la cancelación no se propagó: el supervisor la absorbió"
+    with pytest.raises(asyncio.CancelledError):
+        task.result()
+
+    s = factory.sessions[0]
+    assert s.stopped is True
+    assert ("replay_end", s.id, s.start) in factory.registry["events"]
+    assert factory.call_count == 1
+    await asyncio.sleep(0)
+    pending = [t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()]
+    assert pending == [], f"tareas internas huérfanas: {pending}"
+
+
+async def test_t15_startup_cut_after_data_opens_recovery_not_backup():
+    """T15 (R1 en el arranque): si el primario ENTREGA velas y se corta antes de REPLAY_COMPLETED,
+    se abre recuperación (espera + start = última + 1 min), no el respaldo start=0 inmediato."""
+    from src.live.recovering_live_source import RecoveringLiveSource
+
+    a, b, g = _candle(T0), _candle(T0 + MINUTE), _candle(T0 + 2 * MINUTE)
+    clock = _FakeClock(T0, sleep_advances=True)
+    factory = _InertStopFactory([
+        [("candle", a), ("candle", b), ("raise", ConnectionError("cut"))],
+        [("candle", g), ("replay_completed",), ("hold",)],
+    ])
+    src = RecoveringLiveSource(make_source=factory, sleep=clock.sleep, now=clock.now, config=_make_config())
+    clock.bind(src)
+    agen = src.replay()
+    try:
+        out = [await asyncio.wait_for(agen.__anext__(), 2) for _ in range(3)]
+        assert [c.timestamp for c in out] == [a.timestamp, b.timestamp, g.timestamp]
+        assert factory.registry["starts"] == [T0 - LOOKBACK, b.timestamp + MINUTE]
+        assert clock.sleeps == [1]
+        assert src.phase == "recovering"  # g llegó antes de su REPLAY_COMPLETED: recuperando, NO terminal
+        assert src.is_replay_complete is False
+    finally:
+        await asyncio.wait_for(agen.aclose(), 2)
+    assert factory.call_count == 2
+    await asyncio.sleep(0)
+    pending = [t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()]
+    assert pending == [], f"tareas internas huérfanas: {pending}"
+
+
+async def _start_consumer(src):
+    got = []
+
+    async def consume():
+        async for c in src.replay():
+            got.append(c)
+
+    return asyncio.create_task(consume()), got
+
+
+async def _cancel(task):
+    task.cancel()
+    done, _ = await asyncio.wait({task}, timeout=2)
+    assert task in done, "la cancelación no se propagó"
+
+
+async def test_t16_bootstrap_replay_completed_without_next_candle():
+    """T16: REPLAY_COMPLETED en el arranque SIN vela posterior (mercado cerrado) → el supervisor
+    pasa a live sin esperar otra vela: evento activado, is_replay_complete True, phase 'live'."""
+    from src.live.recovering_live_source import RecoveringLiveSource
+
+    clock = _FakeClock(T0, sleep_advances=True)
+    factory = _InertStopFactory([[("replay_completed",), ("hold",)]])
+    src = RecoveringLiveSource(make_source=factory, sleep=clock.sleep, now=clock.now, config=_make_config())
+    clock.bind(src)
+    task, got = await _start_consumer(src)
+    try:
+        await asyncio.wait_for(src.replay_completed_event.wait(), 2)
+        assert src.is_replay_complete is True
+        assert src.phase == "live"
+        assert got == []
+        assert not any(ev[0] == "replay_end" for ev in factory.registry["events"])  # sesión sigue abierta
+    finally:
+        await _cancel(task)
+    assert factory.call_count == 1
+
+
+async def test_t17_recovery_replay_completed_without_next_candle():
+    """T17 (caso sábado): la sesión de recuperación completa su replay SIN velas nuevas → vuelve a
+    live sin esperar vela: phase 'live', is_replay_complete True, recovering_since None."""
+    from src.live.recovering_live_source import RecoveringLiveSource
+
+    c1 = _candle(T0)
+    clock = _FakeClock(T0, sleep_advances=True)
+    factory = _InertStopFactory([
+        [("replay_completed",), ("candle", c1), ("raise", ConnectionError("gateway restart"))],
+        [("replay_completed",), ("hold",)],
+    ])
+    src = RecoveringLiveSource(make_source=factory, sleep=clock.sleep, now=clock.now, config=_make_config())
+    clock.bind(src)
+    task, got = await _start_consumer(src)
+    try:
+        for _ in range(200):
+            if factory.call_count == 2 and src.phase == "live":
+                break
+            await asyncio.sleep(0)
+        assert [c.timestamp for c in got] == [c1.timestamp]
+        assert factory.call_count == 2
+        assert src.phase == "live"
+        assert src.is_replay_complete is True
+        assert src.recovering_since is None
+        assert clock.sleeps == [1]
+    finally:
+        await _cancel(task)
+
+
+async def test_t18_recovery_without_anchor_uses_start_zero_once_per_attempt():
+    """T18: sin vela entregada (last_delivered None) la recuperación usa start=0 como primario, sin
+    TypeError, y si falla antes de datos NO repite start=0 en el mismo intento: espera y reintenta."""
+    from src.live.recovering_live_source import RecoveringLiveSource
+
+    g = _candle(T0 + MINUTE)
+    clock = _FakeClock(T0, sleep_advances=True)
+    factory = _InertStopFactory([
+        [("replay_completed",), ("end",)],                 # arranque: live sin velas, luego fin
+        [("end",)],                                        # intento 1: start=0 falla sin datos
+        [("replay_completed",), ("candle", g), ("hold",)], # intento 2: start=0 recupera
+    ])
+    src = RecoveringLiveSource(make_source=factory, sleep=clock.sleep, now=clock.now, config=_make_config())
+    clock.bind(src)
+    agen = src.replay()
+    try:
+        c = await asyncio.wait_for(agen.__anext__(), 2)
+        assert c.timestamp == g.timestamp
+        assert factory.registry["starts"] == [T0 - LOOKBACK, 0, 0]
+        assert clock.sleeps == [1, 2]
+        assert factory.registry["max_active"] == 1
+        assert src.phase == "live"
+    finally:
+        await asyncio.wait_for(agen.aclose(), 2)
+    assert factory.call_count == 3
+
+
+class _YieldingClock(_FakeClock):
+    """Como _FakeClock, pero su sleep CEDE el control al loop (como asyncio.sleep real) y registra
+    el estado del supervisor DESPUÉS de ceder."""
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.after_yield: list[tuple] = []
+
+    async def sleep(self, seconds: float) -> None:
+        await super().sleep(seconds)
+        for _ in range(5):
+            await asyncio.sleep(0)
+        self.after_yield.append((self._src.phase, self._src.recovering_since))
+
+
+async def test_t19_ended_session_cannot_mark_live_during_backoff():
+    """T19: REPLAY_COMPLETED y corte en la misma ráfaga. Durante la espera de recuperación (que cede
+    el loop) nada de la sesión terminada puede devolver la fase a live ni borrar recovering_since."""
+    from src.live.recovering_live_source import RecoveringLiveSource
+
+    c1, g = _candle(T0), _candle(T0 + MINUTE)
+    clock = _YieldingClock(T0, sleep_advances=True)
+    factory = _InertStopFactory([
+        [("replay_completed",), ("candle", c1), ("raise", ConnectionError("cut"))],
+        [("candle", g), ("replay_completed",), ("hold",)],
+    ])
+    src = RecoveringLiveSource(make_source=factory, sleep=clock.sleep, now=clock.now, config=_make_config())
+    clock.bind(src)
+    agen = src.replay()
+    try:
+        out = [await asyncio.wait_for(agen.__anext__(), 2) for _ in range(2)]
+        assert [c.timestamp for c in out] == [c1.timestamp, g.timestamp]
+        assert clock.after_yield == [("recovering", T0)]
+    finally:
+        await asyncio.wait_for(agen.aclose(), 2)
