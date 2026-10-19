@@ -423,3 +423,186 @@ async def test_t7_is_replay_complete_rearm_sequence():
         assert src.phase == "live" and src.is_replay_complete is True
     finally:
         await agen.aclose()
+
+
+# ============================ TESTS Ola 2 (T12, T13) =======================
+
+async def test_t12_replay_completed_event_latches_and_never_clears():
+    """T12: replay_completed_event: False al inicio; True tras el primer REPLAY_COMPLETED; sigue
+    True durante una recuperación (mientras is_replay_complete del supervisor es False) y después
+    de ella. Nunca se limpia."""
+    from src.live.recovering_live_source import RecoveringLiveSource  # noqa: F401
+
+    live_ini = _candle(T0 + 0 * MINUTE)
+    g1 = _candle(T0 + 1 * MINUTE)      # vela de recuperación ANTES del replay_completed de recuperación
+    live1 = _candle(T0 + 2 * MINUTE)
+
+    clock = _FakeClock(T0, sleep_advances=True)
+    factory = _ScriptedFactory([
+        [("replay_completed",), ("candle", live_ini), ("raise", ConnectionError("drop"))],
+        [("candle", g1), ("replay_completed",), ("candle", live1), ("hold",)],
+    ])
+    src = _new(factory, clock)
+
+    # Al inicio: el evento existe y NO está activado.
+    assert src.replay_completed_event.is_set() is False
+
+    agen = src.replay()
+    try:
+        c0 = await agen.__anext__()     # live_ini: tras REPLAY_COMPLETED inicial
+        assert c0.timestamp == live_ini.timestamp
+        assert src.replay_completed_event.is_set() is True  # se activó con el 1er REPLAY_COMPLETED
+
+        c1 = await agen.__anext__()     # g1: durante la recuperación (is_replay_complete False)
+        assert c1.timestamp == g1.timestamp
+        assert src.is_replay_complete is False
+        # El EVENTO latcheado sigue True aunque el supervisor esté recovering.
+        assert src.replay_completed_event.is_set() is True
+
+        c2 = await agen.__anext__()     # live1: tras REPLAY_COMPLETED de recuperación
+        assert c2.timestamp == live1.timestamp
+        assert src.is_replay_complete is True
+        assert src.replay_completed_event.is_set() is True
+    finally:
+        await agen.aclose()
+
+    # Después de todo: el evento jamás se limpió.
+    assert src.replay_completed_event.is_set() is True
+
+
+class _InertStopSession:
+    """Fake PROPIO de T13: stop() SOLO registra (no libera 'hold' ni termina el generador).
+
+    El único modo de desbloquear un 'hold' o de finalizar el generador es que el consumidor
+    cierre el async generator (aclose), lo que inyecta GeneratorExit en el `await`/`yield`.
+    Así T13 comprueba que el supervisor cierra realmente el generador interno (aclose), no solo
+    que llama stop().
+    """
+
+    _next_id = 0
+
+    def __init__(self, start, script, registry):
+        self.start = start
+        self._script = list(script)
+        self._registry = registry
+        self.is_replay_complete = False
+        self.replay_completed_event = asyncio.Event()
+        self.stopped = False
+        _InertStopSession._next_id += 1
+        self.id = _InertStopSession._next_id
+        self._never = asyncio.Event()  # jamás se activa; stop() NO lo toca
+        registry["starts"].append(start)
+        registry["events"].append(("make", self.id, start))
+
+    async def replay(self):
+        self._registry["events"].append(("replay_start", self.id, self.start))
+        self._registry["active"] += 1
+        self._registry["max_active"] = max(self._registry["max_active"], self._registry["active"])
+        try:
+            for ev in self._script:
+                kind = ev[0]
+                if kind == "candle":
+                    yield ev[1]
+                elif kind == "replay_completed":
+                    self.is_replay_complete = True
+                    self.replay_completed_event.set()
+                elif kind == "end":
+                    return
+                elif kind == "raise":
+                    raise ev[1]
+                elif kind == "hold":
+                    await self._never.wait()   # solo GeneratorExit (aclose) lo desbloquea
+                else:  # pragma: no cover
+                    raise AssertionError(f"evento desconocido: {kind}")
+        finally:
+            self._registry["active"] -= 1
+            self._registry["events"].append(("replay_end", self.id, self.start))
+
+    def stop(self):
+        # SOLO registra. No libera 'hold' ni termina el generador.
+        self.stopped = True
+        self._registry["events"].append(("stop", self.id, self.start))
+
+
+class _InertStopFactory:
+    def __init__(self, scripts):
+        self._scripts = list(scripts)
+        self._i = 0
+        self.registry = {"starts": [], "events": [], "active": 0, "max_active": 0}
+        self.sessions: list[_InertStopSession] = []
+
+    def __call__(self, start):
+        if self._i >= len(self._scripts):
+            raise AssertionError(
+                f"make_source llamado {self._i + 1} veces; solo hay {len(self._scripts)} guiones"
+            )
+        script = self._scripts[self._i]
+        self._i += 1
+        s = _InertStopSession(start, script, self.registry)
+        self.sessions.append(s)
+        return s
+
+    @property
+    def call_count(self) -> int:
+        return self._i
+
+    def _first_index(self, kind, sess_id):
+        for idx, ev in enumerate(self.registry["events"]):
+            if ev[0] == kind and ev[1] == sess_id:
+                return idx
+        raise AssertionError(f"evento {kind} de sesión {sess_id} no registrado")
+
+
+async def test_t13_inner_stream_closed_on_cut_and_on_external_aclose():
+    """T13 cierre real del stream interno, con un fake donde stop() solo registra.
+
+    (A) corte en vivo → ('replay_end', vieja) ANTES de ('replay_start', nueva).
+    (B) aclose del generador externo con la sesión en 'hold' → se registran stop(actual) y
+        ('replay_end', actual) y NO se crea otra sesión.
+    Las esperas se envuelven con asyncio.wait_for(..., 2) para que un cierre faltante falle
+    (timeout) en vez de colgar.
+    """
+    from src.live.recovering_live_source import RecoveringLiveSource  # noqa: F401
+
+    c1 = _candle(T0 + 0 * MINUTE)
+    g1 = _candle(T0 + 1 * MINUTE)
+    live1 = _candle(T0 + 2 * MINUTE)
+
+    clock = _FakeClock(T0, sleep_advances=True)
+    factory = _InertStopFactory([
+        # inicial: completa, entrega c1, luego CORTE en vivo (raise) -> abre recuperación
+        [("replay_completed",), ("candle", c1), ("raise", ConnectionError("cut"))],
+        # recuperación: entrega g1, completa, entrega live1, y queda en 'hold'
+        [("candle", g1), ("replay_completed",), ("candle", live1), ("hold",)],
+    ])
+    from src.live.recovering_live_source import RecoveringLiveSource as _RLS
+    src = _RLS(make_source=factory, sleep=clock.sleep, now=clock.now, config=_make_config())
+    clock.bind(src)
+
+    agen = src.replay()
+    try:
+        c_c1 = await asyncio.wait_for(agen.__anext__(), 2)
+        assert c_c1.timestamp == c1.timestamp
+
+        # (A) El corte en vivo debe cerrar el generador de la sesión vieja (replay_end) ANTES de
+        # abrir la nueva (replay_start). Consumimos g1 (primera vela de la recuperación).
+        c_g1 = await asyncio.wait_for(agen.__anext__(), 2)
+        assert c_g1.timestamp == g1.timestamp
+
+        old = factory.sessions[0]
+        new = factory.sessions[1]
+        assert factory._first_index("replay_end", old.id) < factory._first_index("replay_start", new.id)
+        assert old.stopped is True  # stop() de la vieja fue llamado
+
+        # Avanzamos a live1 (sesión de recuperación ya en vivo; luego quedará en 'hold').
+        c_live1 = await asyncio.wait_for(agen.__anext__(), 2)
+        assert c_live1.timestamp == live1.timestamp
+    finally:
+        # (B) Cierre externo con la sesión actual en 'hold': el supervisor debe cerrar el
+        # generador interno (aclose -> replay_end) y llamar stop(actual), sin abrir otra sesión.
+        await asyncio.wait_for(agen.aclose(), 2)
+
+    new = factory.sessions[1]
+    assert new.stopped is True
+    assert ("replay_end", new.id, new.start) in factory.registry["events"]
+    assert factory.call_count == 2  # no se creó ninguna sesión adicional
