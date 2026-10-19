@@ -222,6 +222,13 @@ async def _processing_loop(suppress_signals=None) -> None:
 
     async for candle in _replay.replay():
         try:
+            # A3c: no enviar al pusher velas que el buffer rechazaria por duplicado/orden.
+            # Si la vela no es estrictamente mas nueva que la ultima en buffer, se salta la
+            # iteracion COMPLETA (ni buffer, ni motor, ni pusher).
+            last_ts = _buffer.last_timestamp()
+            if last_ts is not None and candle.timestamp <= last_ts:
+                continue
+
             # Append to buffer
             _buffer.append(candle)
 
@@ -359,11 +366,22 @@ async def lifespan(app: FastAPI):
             symbol=_settings.databento_symbol,
             stype_in=_settings.databento_stype_in,
         )
-        # Inicio de replay: now - LOOKBACK (tz-aware UTC; el SDK convierte a ns internamente).
-        replay_start = datetime.now(timezone.utc) - timedelta(minutes=LIVE_REPLAY_LOOKBACK_MINUTES)
-        # Fuente Live con replay start; ReconnectPolicy=NONE (una sola conexion).
-        _replay = connector.live_candle_source(replay_start=replay_start)
-        _live_source = _replay  # referencia para el predicado de supresion
+        # A3c: fuente Live con RECUPERACIÓN. RecoveringLiveSource supervisa el ciclo de vida de
+        # las sesiones (corte -> recovering -> live, o terminal) sin activar el reconnect del SDK.
+        # La fábrica crea una sesión por cada `start` (datetime o el entero 0 para "desde el inicio").
+        from src.live.recovering_live_source import RecoveringLiveSource
+
+        _replay = RecoveringLiveSource(
+            make_source=lambda start: connector.live_candle_source(replay_start=start),
+            sleep=asyncio.sleep,
+            now=lambda: datetime.now(timezone.utc),
+            config={
+                "lookback": timedelta(minutes=LIVE_REPLAY_LOOKBACK_MINUTES),
+                "recovery_delays_seconds": [1, 2, 4, 8, 16, 30, 60],
+                "terminal_after": timedelta(minutes=30),
+            },
+        )
+        _live_source = _replay  # referencia para el predicado de supresion y la espera inicial
 
         # Supresion de senales mientras el replay esta en curso: la Signal se descarta hasta que
         # la fuente observe REPLAY_COMPLETED. El motor SIGUE evaluandose (se calienta su estado).
@@ -383,12 +401,12 @@ async def lifespan(app: FastAPI):
         # se registra en live. NO reintenta ni reconecta: solo hace OBSERVABLE la terminacion.
         _pipeline_task.add_done_callback(_on_pipeline_task_done)
         logger.info(
-            "Live started (replay bootstrap): %s %s %s stype=%s, replay_start=%s, ReconnectPolicy=NONE.",
+            "Live started (replay bootstrap): %s %s %s stype=%s, lookback=%dm, A3c recovery.",
             _settings.databento_dataset,
             "ohlcv-1m",
             _settings.databento_symbol,
             _settings.databento_stype_in,
-            replay_start.isoformat(),
+            LIVE_REPLAY_LOOKBACK_MINUTES,
         )
 
         # Espera de la frontera REPLAY_COMPLETED durante el arranque, con degradacion con gracia:
@@ -495,6 +513,18 @@ async def health_check():
             status_code=503,
             content={"status": "down", "phase": "terminal", "mode": "live"},
         )
+
+    # 3b) A3c: si la fuente expone `phase` (RecoveringLiveSource), su fase manda para recovering/
+    # terminal. "terminal" => 503; "recovering" => 200 ok; "bootstrapping"/"live" o sin phase =>
+    # se delega en la logica historica de abajo (sin cambios).
+    _source_phase = getattr(_replay, "phase", None)
+    if _source_phase == "terminal":
+        return JSONResponse(
+            status_code=503,
+            content={"status": "down", "phase": "terminal", "mode": "live"},
+        )
+    if _source_phase == "recovering":
+        return {"status": "ok", "phase": "recovering", "mode": "live"}
 
     # replay completo? se lee del global _replay (LiveCandleSource en live), sin crear estado nuevo.
     replay_complete = _replay is not None and getattr(_replay, "is_replay_complete", False)

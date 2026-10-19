@@ -6,7 +6,8 @@ pydantic-settings>=2.1.0
 python-dotenv>=1.0.0
 
 # Data provider
-databento>=0.39.0
+databento==0.87.0
+databento-dbn==0.70.0
 
 # Testing
 hypothesis>=6.92.0
