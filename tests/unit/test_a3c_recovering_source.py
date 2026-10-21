@@ -806,3 +806,42 @@ async def test_t19_ended_session_cannot_mark_live_during_backoff():
         assert clock.after_yield == [("recovering", T0)]
     finally:
         await asyncio.wait_for(agen.aclose(), 2)
+
+
+# ============================ TEST A3c.1 (T20) ==============================
+
+async def test_t20_stop_contract_for_app_shutdown():
+    """T20: app.py llama _replay.stop() al apagar. RecoveringLiveSource debe exponer stop() síncrono e
+    idempotente (sin sesión no falla; con sesión en 'hold' llama stop() de la sesión) y, al cancelar
+    luego la tarea consumidora, la sesión se cierra (replay_end), sin abrir otra ni dejar tareas huérfanas."""
+    from src.live.recovering_live_source import RecoveringLiveSource
+
+    c1 = _candle(T0)
+    clock = _FakeClock(T0, sleep_advances=True)
+    factory = _InertStopFactory([[("replay_completed",), ("candle", c1), ("hold",)]] + [[("hold",)]] * 3)
+    src = RecoveringLiveSource(make_source=factory, sleep=clock.sleep, now=clock.now, config=_make_config())
+    clock.bind(src)
+    src.stop()  # sin sesión: no falla
+    got = []
+
+    async def consume():
+        async for c in src.replay():
+            got.append(c)
+
+    task = asyncio.create_task(consume())
+    for _ in range(50):
+        if got:
+            break
+        await asyncio.sleep(0)
+    s = factory.sessions[0]
+    src.stop()          # secuencia de app.py: primero stop() ...
+    src.stop()          # ... idempotente
+    assert s.stopped is True
+    task.cancel()       # ... luego cancelar la tarea del pipeline
+    done, _ = await asyncio.wait({task}, timeout=2)
+    assert task in done
+    assert ("replay_end", s.id, s.start) in factory.registry["events"]
+    assert factory.call_count == 1
+    await asyncio.sleep(0)
+    pending = [t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()]
+    assert pending == [], f"tareas internas huérfanas: {pending}"
