@@ -112,6 +112,17 @@ class RecoveringLiveSource:
     def replay_completed_event(self):
         return self._replay_completed_event
 
+    def stop(self) -> None:
+        """Apagado (lo llama app.py en el shutdown del lifespan). Síncrono e idempotente.
+        Delega en stop() de la sesión actual; el cierre real del generador ocurre cuando app.py
+        cancela la tarea del pipeline (el finally de replay() hace aclose + stop)."""
+        stop = getattr(self._cur_session, "stop", None)
+        if callable(stop):
+            try:
+                stop()
+            except Exception as exc:
+                logger.debug("stop() de la sesión lanzó (ignorado): %r", exc)
+
     # --- helpers -------------------------------------------------------------
     def _delay_for(self, attempt_index: int) -> float:
         if not self._delays:
