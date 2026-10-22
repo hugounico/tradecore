@@ -9,6 +9,7 @@ Requirements: RF-01.1, RF-01.2, RF-01.4, RF-02.2, RF-03.1
 """
 
 import asyncio
+import dataclasses
 import json
 import logging
 import time
@@ -237,6 +238,9 @@ async def _processing_loop(suppress_signals=None) -> None:
 
             # Evaluate signal
             signal = _engine.evaluate(closes)
+            # A5.1a: la hora de la senal es la de su vela (el motor usa el reloj del servidor).
+            if signal is not None:
+                signal = dataclasses.replace(signal, timestamp=candle.timestamp)
 
             # Queue candle update
             await _pusher.queue_candle(candle)
