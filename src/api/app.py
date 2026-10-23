@@ -28,6 +28,7 @@ from src.config import Settings
 from src.connectors.databento_connector import DabentoConnector
 from src.engine.signal_engine import SignalEngine
 from src.pipeline.candle_buffer import CandleBuffer
+from src.pipeline.file_replay_source import FileReplaySource, load_candles_parquet
 from src.pipeline.simulation_replay import SimulationReplay
 from src.schemas.candle import Candle
 
@@ -181,6 +182,14 @@ async def _flush_loop() -> None:
             await asyncio.sleep(0.1)
 
 
+def _market_open_flag() -> bool:
+    """A5.1b: mercado abierto segun el reloj real; en MODE=replay, segun la hora de la ultima vela reproducida."""
+    if _settings is not None and _settings.mode == "replay":
+        last = _buffer.last_timestamp() if _buffer is not None else None
+        return bool(last is not None and is_regular_market_open(last))
+    return is_regular_market_open(datetime.now(timezone.utc))
+
+
 async def _heartbeat_loop() -> None:
     """A3a: broadcast a heartbeat to all clients every HEARTBEAT_INTERVAL_SECONDS.
 
@@ -193,7 +202,7 @@ async def _heartbeat_loop() -> None:
         try:
             await asyncio.sleep(HEARTBEAT_INTERVAL_SECONDS)
             if _pusher is not None:
-                market_open = is_regular_market_open(datetime.now(timezone.utc))
+                market_open = _market_open_flag()
                 await _pusher.send_heartbeat(market_open)
         except asyncio.CancelledError:
             break
@@ -358,6 +367,24 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning("No historical candles loaded. Simulation will not run.")
 
+    elif _settings.mode == "replay":
+        # A5.1b: staging/tests. Velas grabadas desde un archivo; sin Databento ni red. Mismo bucle y
+        # misma supresion de senales que live (la precarga de 90 min calienta el motor sin emitir).
+        # Fuera de MODE=live, /health responde 200 y el fin del archivo no reinicia la tarea.
+        _replay = FileReplaySource(
+            candles=load_candles_parquet(_settings.replay_file),
+            start=datetime.fromisoformat(_settings.replay_start),
+            speed=_settings.replay_speed,
+        )
+        _replay_source = _replay
+        _pipeline_task = asyncio.create_task(
+            _processing_loop(suppress_signals=lambda: not _replay_source.is_replay_complete)
+        )
+        logger.info(
+            "Replay started: file=%s start=%s speed=%s (no Databento).",
+            _settings.replay_file, _settings.replay_start, _settings.replay_speed,
+        )
+
     elif _settings.mode == "live":
         # LIVE_REPLAY_BOOTSTRAP_SLICE (ver tasks.md): rama Live con bootstrap de contexto por
         # intraday replay. Pide replay desde now-LOOKBACK, alimenta buffer+engine SIN emitir
@@ -444,6 +471,8 @@ async def lifespan(app: FastAPI):
             await _pipeline_task
         except asyncio.CancelledError:
             pass
+        except Exception as exc:  # A5.1b: un pipeline ya muerto no debe impedir el apagado
+            logger.error("Pipeline task had failed before shutdown: %r", exc)
     if _flush_task is not None:
         _flush_task.cancel()
         try:
@@ -498,6 +527,17 @@ async def health_check():
     orquestador (ECS/ALB) lo detecte, en vez de servir 200 con el dashboard congelado.
     """
     global _stall_warning_logged
+
+    # A5.1b: replay informa su fase; si el pipeline murio por excepcion => 503 (el fin normal del
+    # archivo, phase=finished, NO es error).
+    if _settings is not None and _settings.mode == "replay":
+        task = _pipeline_task
+        if task is not None and task.done() and not task.cancelled() and task.exception() is not None:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "down", "phase": "error", "mode": "replay"},
+            )
+        return {"status": "ok", "phase": getattr(_replay, "phase", "starting"), "mode": "replay"}
 
     # Guard: solo live usa el contrato nuevo. Sin settings o en simulation => salud historica intacta.
     if _settings is None or _settings.mode != "live":
@@ -598,7 +638,7 @@ async def websocket_chart(ws: WebSocket) -> None:
             s for s in _signal_history if first_ts <= s.timestamp <= last_ts
         ]
 
-    market_open = is_regular_market_open(datetime.now(timezone.utc))
+    market_open = _market_open_flag()
 
     initial_msg = _build_initial_load_message(
         candles,
