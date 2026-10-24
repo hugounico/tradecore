@@ -28,6 +28,41 @@ from src.schemas.candle import Candle
 _REQUIRED_COLUMNS = ("open", "high", "low", "close", "volume")
 
 
+def fetch_replay_file(source: str, expected_sha256: str = "") -> str:
+    """A5.1c: devuelve una ruta local. Una ruta se devuelve tal cual. Una URL (enlace firmado de S3) debe ser
+    https (http solo hacia 127.0.0.1/localhost, para tests); se descarga por partes a un archivo temporal
+    calculando su SHA-256, que debe coincidir con expected_sha256 (obligatorio). Ningun error incluye la URL
+    (su firma es una credencial temporal). El archivo temporal vive hasta que termina el contenedor."""
+    if not source.startswith(("https://", "http://")):
+        return source
+    import hashlib
+    import os
+    import tempfile
+    import urllib.parse
+    import urllib.request
+
+    host = urllib.parse.urlsplit(source).hostname or ""
+    if source.startswith("http://") and host not in ("127.0.0.1", "localhost"):
+        raise ValueError("la URL de replay debe ser https")
+    if not expected_sha256:
+        raise ValueError("una URL de replay exige replay_sha256")
+    digest = hashlib.sha256()
+    fd, path = tempfile.mkstemp(suffix=".parquet")
+    try:
+        with os.fdopen(fd, "wb") as out, urllib.request.urlopen(source, timeout=60) as resp:
+            for chunk in iter(lambda: resp.read(1 << 20), b""):
+                digest.update(chunk)
+                out.write(chunk)
+    except Exception as exc:
+        os.unlink(path)
+        detail = getattr(exc, "code", None) or type(exc).__name__
+        raise ValueError(f"no se pudo descargar el archivo de replay ({detail})") from None
+    if digest.hexdigest() != expected_sha256.strip().lower():
+        os.unlink(path)
+        raise ValueError(f"la huella del archivo de replay no coincide: {digest.hexdigest()}")
+    return path
+
+
 def load_candles_parquet(path: str) -> list[Candle]:
     """Lee un parquet OHLCV de 1 minuto (indice ts_event con zona horaria) SIN reordenarlo.
 

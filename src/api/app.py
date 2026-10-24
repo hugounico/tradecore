@@ -28,7 +28,7 @@ from src.config import Settings
 from src.connectors.databento_connector import DabentoConnector
 from src.engine.signal_engine import SignalEngine
 from src.pipeline.candle_buffer import CandleBuffer
-from src.pipeline.file_replay_source import FileReplaySource, load_candles_parquet
+from src.pipeline.file_replay_source import FileReplaySource, fetch_replay_file, load_candles_parquet
 from src.pipeline.simulation_replay import SimulationReplay
 from src.schemas.candle import Candle
 
@@ -372,7 +372,7 @@ async def lifespan(app: FastAPI):
         # misma supresion de senales que live (la precarga de 90 min calienta el motor sin emitir).
         # Fuera de MODE=live, /health responde 200 y el fin del archivo no reinicia la tarea.
         _replay = FileReplaySource(
-            candles=load_candles_parquet(_settings.replay_file),
+            candles=load_candles_parquet(fetch_replay_file(_settings.replay_file, _settings.replay_sha256)),
             start=datetime.fromisoformat(_settings.replay_start),
             speed=_settings.replay_speed,
         )
@@ -382,7 +382,7 @@ async def lifespan(app: FastAPI):
         )
         logger.info(
             "Replay started: file=%s start=%s speed=%s (no Databento).",
-            _settings.replay_file, _settings.replay_start, _settings.replay_speed,
+            _settings.replay_file.split("?", 1)[0], _settings.replay_start, _settings.replay_speed,
         )
 
     elif _settings.mode == "live":
