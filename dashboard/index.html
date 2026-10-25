@@ -5,12 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TradeCore — NQ Futures Dashboard</title>
     <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-    <link rel="stylesheet" href="styles.css?v=a41">
+    <link rel="stylesheet" href="styles.css?v=a42">
 </head>
 <body>
     <div id="header">
         <h1>TradeCore — NQ Futures</h1>
         <div id="status-bar">
+            <div id="timeframe-selector" role="group" aria-label="Temporalidad">
+                <button type="button" class="tf-btn" data-tf="1m">1m</button>
+                <button type="button" class="tf-btn" data-tf="5m">5m</button>
+            </div>
             <span id="mode-badge">—</span>
             <div id="connection-indicator">
                 <span id="connection-dot"></span>
@@ -26,6 +30,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=a41"></script>
+    <script src="app.js?v=a42"></script>
 </body>
 </html>

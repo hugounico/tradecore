@@ -84,6 +84,31 @@
             color: #69f0ae;
         }
 
+        #mode-badge.replay {
+            background: #4e342e;
+            color: #ffb74d;
+        }
+
+        #timeframe-selector {
+            display: flex;
+            gap: 2px;
+        }
+
+        .tf-btn {
+            padding: 2px 8px;
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            background: transparent;
+            color: #aaa;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .tf-btn.active {
+            background: #0f3460;
+            color: #e0e0e0;
+        }
+
         #last-timestamp {
             color: #888;
             font-size: 11px;
