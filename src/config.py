@@ -45,3 +45,9 @@ class Settings(BaseSettings):
 
     # Operation mode: "simulation" (Fase A) or "live" (Fase B)
     mode: str = "simulation"
+
+    # A5.1b: MODE=replay (staging/tests). Reproduce velas grabadas; NO se conecta a Databento.
+    replay_file: str = ""  # parquet OHLCV 1m con indice ts_event UTC
+    replay_start: str = ""  # hora UTC ISO-8601 de inicio; la precarga son los 90 min previos
+    replay_speed: float = 60.0  # 60 => 1 minuto de mercado por segundo; 0 => sin esperas
+    replay_sha256: str = ""  # A5.1c: obligatoria si replay_file es una URL (enlace firmado de S3)
