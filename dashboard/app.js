@@ -49,6 +49,22 @@
         var marketOpen = null;          // bandera de horario regular del mercado (del backend)
         var dataLoaded = false;
 
+        // --- A4.2: temporalidad visual (1m / 5m) ---
+        // La matematica (velas, SMA y senales) es SIEMPRE de 1 minuto y la calcula el backend.
+        // La vista de 5 minutos solo AGRUPA en el navegador las velas de 1 minuto:
+        //   O = open del primer minuto, H = maximo, L = minimo, C = close del ultimo minuto,
+        //   V = suma; bloques UTC de 300 s (:00, :05, :10 ...). La vela en curso se actualiza.
+        // En 5m las SMA son las del motor de 1m (valor del ultimo minuto de cada bloque) y se
+        // rotulan igual que en 1m: "SMA 9" / "SMA 21" (decision de Hugo, 26-oct). Cada senal se
+        // dibuja sobre el bloque que la contiene y no se pierde ninguna (varias senales en un mismo
+        // bloque quedan todas visibles).
+        var TF_SECONDS = { '1m': 60, '5m': 300 };
+        var TF_STORAGE_KEY = 'tradecore.timeframe';
+        var timeframe = '5m';  // por defecto 5m (pedido de Felipe); se recuerda la eleccion del usuario
+        // Verdad de 1 minuto recibida del backend (la vista se reconstruye desde aqui).
+        var raw = { candles: [], smaFast: [], smaSlow: [], signals: [] };
+        var MODE_LABELS = { simulation: 'Simulación', live: 'Live', replay: 'Replay' };
+
         // --- DOM refs ---
         var loadingOverlay = document.getElementById('loading-overlay');
         var connectionDot = document.getElementById('connection-dot');
@@ -113,6 +129,109 @@
                     });
                 }
             });
+        }
+
+        // --- A4.2: agrupacion por temporalidad ---
+        function bucketOf(t) {
+            return t - (t % TF_SECONDS[timeframe]);
+        }
+
+        // Agrega al final o reemplaza el ultimo punto con el mismo tiempo (los handlers ya
+        // descartan los puntos mas viejos que la ultima vela).
+        function upsertLast(arr, item) {
+            if (arr.length > 0 && arr[arr.length - 1].time === item.time) {
+                arr[arr.length - 1] = item;
+            } else {
+                arr.push(item);
+            }
+        }
+
+        function aggregateCandles(candles) {
+            var out = [];
+            for (var i = 0; i < candles.length; i++) {
+                var c = candles[i];
+                var b = bucketOf(c.time);
+                var last = out.length > 0 ? out[out.length - 1] : null;
+                if (last && last.time === b) {
+                    last.high = Math.max(last.high, c.high);
+                    last.low = Math.min(last.low, c.low);
+                    last.close = c.close;
+                    last.volume = last.volume + (c.volume || 0);
+                } else {
+                    out.push({ time: b, open: c.open, high: c.high, low: c.low,
+                               close: c.close, volume: c.volume || 0 });
+                }
+            }
+            return out;
+        }
+
+        // Vela agrupada del bloque b (solo los minutos de ese bloque, que estan al final).
+        function bucketCandleAt(b) {
+            var i0 = raw.candles.length;
+            while (i0 > 0 && raw.candles[i0 - 1].time >= b) { i0--; }
+            return aggregateCandles(raw.candles.slice(i0))[0];
+        }
+
+        function aggregateLine(points) {
+            var out = [];
+            for (var i = 0; i < points.length; i++) {
+                upsertLast(out, { time: bucketOf(points[i].time), value: points[i].value });
+            }
+            return out;
+        }
+
+        function markerForView(sig) {
+            var m = buildMarker(sig);
+            if (m) { m.time = bucketOf(sig.time); }
+            return m;
+        }
+
+        // Reconstruye TODA la vista (velas, SMA, marcadores, rotulos) desde la verdad de 1m.
+        function render() {
+            candlestickSeries.setData(aggregateCandles(raw.candles));
+            smaFastSeries.setData(aggregateLine(raw.smaFast));
+            smaSlowSeries.setData(aggregateLine(raw.smaSlow));
+            markers = [];
+            for (var i = 0; i < raw.signals.length; i++) {
+                var m = markerForView(raw.signals[i]);
+                if (m) { markers.push(m); }
+            }
+            markers.sort(function (a, b) { return a.time - b.time; });
+            candlestickSeries.setMarkers(markers);
+        }
+
+        function markTimeframeButtons() {
+            var btns = document.querySelectorAll('#timeframe-selector .tf-btn');
+            for (var i = 0; i < btns.length; i++) {
+                if (btns[i].getAttribute('data-tf') === timeframe) {
+                    btns[i].classList.add('active');
+                } else {
+                    btns[i].classList.remove('active');
+                }
+            }
+        }
+
+        function setTimeframe(tf) {
+            if (!TF_SECONDS.hasOwnProperty(tf) || tf === timeframe) { return; }
+            timeframe = tf;
+            try { window.localStorage.setItem(TF_STORAGE_KEY, tf); } catch (e) { /* sin almacenamiento */ }
+            markTimeframeButtons();
+            render();
+            chart.timeScale().fitContent();
+        }
+
+        function initTimeframe() {
+            var saved = null;
+            try { saved = window.localStorage.getItem(TF_STORAGE_KEY); } catch (e) { /* sin almacenamiento */ }
+            if (saved && TF_SECONDS.hasOwnProperty(saved)) { timeframe = saved; }
+            var btns = document.querySelectorAll('#timeframe-selector .tf-btn');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].addEventListener('click', function () {
+                    setTimeframe(this.getAttribute('data-tf'));
+                });
+            }
+            markTimeframeButtons();
+            render();
         }
 
         // --- WebSocket ---
@@ -299,28 +418,25 @@
             // initial_load REEMPLAZA todo el estado. Un cliente que (re)conecta parte
             // de cero con lo que el backend considera la verdad actual de la sesion.
 
-            // Velas (setData reemplaza toda la serie; [] la vacia sin romper).
-            candlestickSeries.setData(data.candles || []);
-            smaFastSeries.setData(data.sma_fast_series || []);
-            smaSlowSeries.setData(data.sma_slow_series || []);
-
-            // Reinicia marcadores y el registro de senales ya vistas, luego repinta
-            // las senales de la sesion que envio el backend (deduplicadas por clave).
-            markers = [];
+            // Guarda la verdad de 1m (velas, SMA y senales deduplicadas por clave) y
+            // reconstruye la vista en la temporalidad elegida (A4.2).
+            raw.candles = (data.candles || []).slice();
+            raw.smaFast = (data.sma_fast_series || []).slice();
+            raw.smaSlow = (data.sma_slow_series || []).slice();
+            raw.signals = [];
             seenSignals = {};
             var sigs = data.signals || [];
             for (var i = 0; i < sigs.length; i++) {
-                var m = buildMarker(sigs[i]);
-                if (m) {
+                if (buildMarker(sigs[i])) {
                     var key = signalKey(sigs[i]);
                     if (!seenSignals[key]) {
                         seenSignals[key] = true;
-                        markers.push(m);
+                        raw.signals.push(sigs[i]);
                     }
                 }
             }
-            markers.sort(function (a, b) { return a.time - b.time; });
-            candlestickSeries.setMarkers(markers);
+            raw.signals.sort(function (a, b) { return a.time - b.time; });
+            render();
 
             // Recuerda el tiempo de la ultima vela y la bandera de mercado abierto.
             if (data.candles && data.candles.length > 0) {
@@ -351,7 +467,12 @@
             // Ignora velas mas viejas que la ultima conocida (evita retrocesos). Una
             // vela con el MISMO tiempo se trata como actualizacion de esa vela.
             if (lastCandleTime !== null && data.time < lastCandleTime) { return; }
-            candlestickSeries.update(data);
+            upsertLast(raw.candles, data);
+            if (timeframe === '1m') {
+                candlestickSeries.update(data);
+            } else {
+                candlestickSeries.update(bucketCandleAt(bucketOf(data.time)));
+            }
             lastCandleTime = data.time;
             refreshStatus();
         }
@@ -359,13 +480,14 @@
         function handleSignal(data) {
             if (!data) return;
 
-            var marker = buildMarker(data);
+            var marker = markerForView(data);
             if (!marker) { return; }
 
             // Dedup por clave "time|signal_type": no dibujar dos veces la misma senal.
             var key = signalKey(data);
             if (seenSignals[key]) { return; }
             seenSignals[key] = true;
+            raw.signals.push(data);
 
             // Inserta y mantiene orden ascendente por tiempo antes de setMarkers.
             markers.push(marker);
@@ -379,22 +501,23 @@
             // la ultima vela conocida; time == actualiza el punto existente.
             if (lastCandleTime !== null && data.time < lastCandleTime) { return; }
             if (data.sma_fast !== undefined) {
-                smaFastSeries.update({ time: data.time, value: data.sma_fast });
+                upsertLast(raw.smaFast, { time: data.time, value: data.sma_fast });
+                smaFastSeries.update({ time: bucketOf(data.time), value: data.sma_fast });
             }
             if (data.sma_slow !== undefined) {
-                smaSlowSeries.update({ time: data.time, value: data.sma_slow });
+                upsertLast(raw.smaSlow, { time: data.time, value: data.sma_slow });
+                smaSlowSeries.update({ time: bucketOf(data.time), value: data.sma_slow });
             }
         }
 
         function handleStatus(data) {
             if (!data) return;
 
-            // Mode badge (etiqueta de modo simulation/live).
+            // Mode badge: mapeo explicito (A4.2). replay ya no se muestra como "Live".
             if (data.mode) {
-                var modeText = data.mode === 'simulation' ? 'Simulación' : 'Live';
-                modeBadge.textContent = modeText;
+                modeBadge.textContent = MODE_LABELS[data.mode] || String(data.mode);
                 modeBadge.className = '';
-                modeBadge.classList.add(data.mode === 'simulation' ? 'simulation' : 'live');
+                if (MODE_LABELS.hasOwnProperty(data.mode)) { modeBadge.classList.add(data.mode); }
             }
 
             // Ultimo timestamp — guarda contra null (buffer vacio) y strings no
@@ -402,7 +525,8 @@
             if (data.last_candle_time) {
                 var dt = new Date(data.last_candle_time);
                 if (!isNaN(dt.getTime())) {
-                    lastTimestampEl.textContent = 'Último: ' + dt.toLocaleTimeString();
+                    // En UTC, igual que el eje del grafico (A4.2).
+                    lastTimestampEl.textContent = 'Último: ' + dt.toISOString().slice(11, 16) + ' UTC';
                 } else {
                     lastTimestampEl.textContent = 'Último: —';
                 }
@@ -455,6 +579,7 @@
 
         // --- Bootstrap ---
         initChart();
+        initTimeframe();
         refreshStatus();      // estado inicial coherente antes de conectar
         connectWebSocket();
     })();
