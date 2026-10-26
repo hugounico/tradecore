@@ -21,7 +21,7 @@ import asyncio
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from starlette.websockets import WebSocket
 
@@ -50,6 +50,17 @@ def signal_payload(signal: Signal) -> dict:
         "sma_fast": signal.sma_fast,
         "sma_slow": signal.sma_slow,
     }
+
+
+def _iso_utc_z(ts: datetime) -> str:
+    """A4.2: ISO 8601 en UTC terminado en "Z" (legible por el navegador).
+
+    Con zona horaria se convierte a UTC (antes se enviaba "...+00:00Z": Invalid Date en el
+    dashboard). Sin zona se asume UTC, igual que el formato previo.
+    """
+    if ts.tzinfo is not None:
+        ts = ts.astimezone(timezone.utc).replace(tzinfo=None)
+    return ts.isoformat() + "Z"
 
 
 class ThrottledPusher:
@@ -137,7 +148,7 @@ class ThrottledPusher:
             "type": "status",
             "data": {
                 "connected": connected,
-                "last_candle_time": last_time.isoformat() + "Z" if last_time else None,
+                "last_candle_time": _iso_utc_z(last_time) if last_time else None,
                 "mode": mode,
             },
         })
