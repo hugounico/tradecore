@@ -55,8 +55,9 @@
         //   O = open del primer minuto, H = maximo, L = minimo, C = close del ultimo minuto,
         //   V = suma; bloques UTC de 300 s (:00, :05, :10 ...). La vela en curso se actualiza.
         // En 5m las SMA son las del motor de 1m (valor del ultimo minuto de cada bloque) y se
-        // rotulan "(motor 1m)"; cada senal se dibuja sobre el bloque que la contiene y no se pierde
-        // ninguna (varias senales en un mismo bloque quedan todas visibles).
+        // rotulan igual que en 1m: "SMA 9" / "SMA 21" (decision de Hugo, 26-oct). Cada senal se
+        // dibuja sobre el bloque que la contiene y no se pierde ninguna (varias senales en un mismo
+        // bloque quedan todas visibles).
         var TF_SECONDS = { '1m': 60, '5m': 300 };
         var TF_STORAGE_KEY = 'tradecore.timeframe';
         var timeframe = '5m';  // por defecto 5m (pedido de Felipe); se recuerda la eleccion del usuario
@@ -197,9 +198,6 @@
             }
             markers.sort(function (a, b) { return a.time - b.time; });
             candlestickSeries.setMarkers(markers);
-            var suffix = timeframe === '1m' ? '' : ' (motor 1m)';
-            smaFastSeries.applyOptions({ title: 'SMA 9' + suffix });
-            smaSlowSeries.applyOptions({ title: 'SMA 21' + suffix });
         }
 
         function markTimeframeButtons() {
