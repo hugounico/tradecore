@@ -46,8 +46,15 @@ _RE_PUBKEY = re.compile(r"\Asb_publishable_[A-Za-z0-9_-]+\Z")
 _RE_UUID = re.compile(r"\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z")
 _RE_ORIGIN = re.compile(r"\Ahttps://[a-z0-9-]+(\.[a-z0-9-]+)+(:[0-9]{1,5})?\Z")
 _RE_SESSION_KEY = re.compile(r"\A[A-Za-z0-9_-]{43,}\Z")
-_RE_POS_INT = re.compile(r"\A[1-9][0-9]*\Z")
+# Entero positivo acotado a 10 dígitos como máximo: evita que int() de cadenas enormes
+# (miles de dígitos) lance ValueError por el límite de conversión de Python.
+_RE_POS_INT = re.compile(r"\A[1-9][0-9]{0,9}\Z")
 _RE_B64URL_32 = re.compile(r"\A[A-Za-z0-9_-]{43}\Z")
+
+# Tamaño máximo del JWKS en caracteres. Límite propio de TradeCore para evitar entradas
+# patológicas (p. ej. miles de corchetes anidados que harían RecursionError en json.loads).
+# Un JWKS con 2 claves ES256 ocupa ~600 caracteres.
+_JWKS_MAX_CHARS = 16384
 
 _DEFAULT_TTL = 28800
 
@@ -105,9 +112,14 @@ def _parse_jwks(text: str) -> Mapping[str, Mapping[str, str]] | None:
     x/y de 43 chars base64url que decodifican a 32 bytes, use ausente o 'sig', key_ops ausente
     o lista que contiene 'verify'. Las claves no ES256 se ignoran; 0 ES256 => None.
     """
+    if len(text) > _JWKS_MAX_CHARS:
+        # Entrada demasiado grande: se rechaza antes de parsear (evita trabajo y recursión
+        # patológica en json.loads sobre miles de estructuras anidadas).
+        return None
     try:
         data = json.loads(text)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, RecursionError):
+        # ValueError/TypeError: JSON mal formado. RecursionError: anidamiento excesivo.
         return None
     if not isinstance(data, dict):
         return None
@@ -175,19 +187,20 @@ def validate_auth_settings(raw: Mapping[str, str | None]) -> AuthConfig:
     if jwks_keys is None:
         invalid.append(_JWKS_JSON)
 
-    # TC_AUTH_ALLOWED_SUBS
+    # TC_AUTH_ALLOWED_SUBS. Se recortan SOLO espacios alrededor de cada elemento (strip(" ")):
+    # un salto de línea o tabulador dentro de un elemento NO se recorta y lo vuelve inválido.
     subs_set: frozenset[str] | None = None
     if _is_present(subs_raw):
-        parts = [p.strip() for p in subs_raw.split(",")]
+        parts = [p.strip(" ") for p in subs_raw.split(",")]
         if parts and all(_RE_UUID.match(p) for p in parts):
             subs_set = frozenset(parts)
     if subs_set is None:
         invalid.append(_ALLOWED_SUBS)
 
-    # TC_AUTH_ALLOWED_ORIGINS
+    # TC_AUTH_ALLOWED_ORIGINS. Igual criterio: strip(" ") recorta solo espacios, no \n/\t.
     origins_set: frozenset[str] | None = None
     if _is_present(origins_raw):
-        parts = [p.strip() for p in origins_raw.split(",")]
+        parts = [p.strip(" ") for p in origins_raw.split(",")]
         if parts and all(_RE_ORIGIN.match(p) for p in parts):
             origins_set = frozenset(parts)
     if origins_set is None:
@@ -204,11 +217,12 @@ def validate_auth_settings(raw: Mapping[str, str | None]) -> AuthConfig:
     if epoch_val is None:
         invalid.append(_SESSION_EPOCH)
 
-    # TC_SESSION_TTL_SECONDS (ausente => default 28800; presente => entero positivo)
+    # TC_SESSION_TTL_SECONDS (ausente => default 28800; presente => entero positivo de hasta 10
+    # dígitos Y además <= 28800, porque el Design fija la sesión en 8 h como máximo, §8/R2).
     ttl_val: int | None
     if not _is_present(ttl_raw):
         ttl_val = _DEFAULT_TTL
-    elif _RE_POS_INT.match(ttl_raw):
+    elif _RE_POS_INT.match(ttl_raw) and int(ttl_raw) <= _DEFAULT_TTL:
         ttl_val = int(ttl_raw)
     else:
         ttl_val = None

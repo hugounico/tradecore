@@ -272,3 +272,99 @@ def test_imports_whitelist():
         elif isinstance(node, ast.ImportFrom):
             imported.add(node.module or "")
     assert imported <= allowed, f"imports no permitidos: {imported - allowed}"
+
+
+# ==============================================================================
+# T1.1 — validación acotada (enteros con tope, TTL <= 8 h, JWTS acotado y listas
+# que NO recortan \n/\t). Cada caso es un ítem de pytest independiente.
+# ==============================================================================
+
+# --- T1.1 INVALID: un solo campo inválido, sin excepción ------------------------
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("TC_SESSION_EPOCH", "1" * 5000),                 # 1: época enorme (no debe lanzar)
+        ("TC_SESSION_EPOCH", "1" * 11),                   # 2: 11 dígitos > 10
+        ("TC_SESSION_TTL_SECONDS", "1" * 5000),           # 3: TTL enorme (no debe lanzar)
+        ("TC_SESSION_TTL_SECONDS", "28801"),              # 4: TTL > 28800
+        ("TC_AUTH_JWKS_JSON", "[" * 200000),              # 5: JWKS gigante (sobre el límite)
+        ("TC_AUTH_JWKS_JSON", "[" * 16000),               # 6: bajo el límite -> RecursionError capturado
+        # 7 se agrega aparte (necesita construir el valor)
+        ("TC_AUTH_ALLOWED_SUBS", UUID_A + "\n"),          # 8: SUBS con salto de línea final
+        ("TC_AUTH_ALLOWED_SUBS", UUID_A + "\t"),          # 9: SUBS con tabulador final
+        ("TC_AUTH_ALLOWED_ORIGINS", "https://a.b\n"),     # 10: ORIGINS con salto de línea final
+    ],
+    # IDs cortos y únicos: evitan que pytest incruste valores gigantes (p. ej.
+    # "[" * 200000) en el nodeid, que en Windows desborda el límite de 32767
+    # caracteres de la variable de entorno PYTEST_CURRENT_TEST.
+    ids=[
+        "epoch_5000",
+        "epoch_11",
+        "ttl_5000",
+        "ttl_28801",
+        "jwks_200k",
+        "jwks_deep_16k",
+        "subs_newline",
+        "subs_tab",
+        "origins_newline",
+    ],
+)
+def test_t11_invalid_single_field(field, value):
+    raw = good_raw()
+    raw[field] = value
+    cfg = validate_auth_settings(raw)
+    assert cfg.status == "INVALID"
+    assert cfg.invalid_fields == (field,)
+
+
+def test_t11_invalid_jwks_padded_over_limit():
+    """Caso 7: GOOD_JWKS con espacios tras el primer '{' hasta 16385 caracteres."""
+    base = GOOD_JWKS
+    idx = base.index("{") + 1
+    pad = 16385 - len(base)
+    assert pad > 0
+    value = base[:idx] + (" " * pad) + base[idx:]
+    assert len(value) == 16385
+    raw = good_raw()
+    raw["TC_AUTH_JWKS_JSON"] = value
+    cfg = validate_auth_settings(raw)
+    assert cfg.status == "INVALID"
+    assert cfg.invalid_fields == ("TC_AUTH_JWKS_JSON",)
+
+
+# --- T1.1 OK --------------------------------------------------------------------
+def test_t11_ok_subs_spaces_trimmed():
+    """Caso 11: espacios alrededor de cada UUID se recortan -> OK."""
+    raw = good_raw()
+    raw["TC_AUTH_ALLOWED_SUBS"] = " " + UUID_A + " , " + UUID_B + " "
+    cfg = validate_auth_settings(raw)
+    assert cfg.status == "OK"
+    assert cfg.allowed_subs == frozenset({UUID_A, UUID_B})
+
+
+def test_t11_ok_epoch_10_digits():
+    """Caso 12: época de 10 dígitos (tope) -> OK."""
+    raw = good_raw()
+    raw["TC_SESSION_EPOCH"] = "9999999999"
+    cfg = validate_auth_settings(raw)
+    assert cfg.status == "OK"
+    assert cfg.session_epoch == 9999999999
+
+
+def test_t11_ok_ttl_max():
+    """Caso 13: TTL = 28800 (tope) -> OK."""
+    raw = good_raw()
+    raw["TC_SESSION_TTL_SECONDS"] = "28800"
+    cfg = validate_auth_settings(raw)
+    assert cfg.status == "OK"
+    assert cfg.session_ttl_seconds == 28800
+
+
+def test_t11_ok_two_es256_keys():
+    """Caso 14: dos claves ES256 (distinto kid) -> OK, jwks_keys con 2 entradas."""
+    second = dict(JWK_ES256, kid="22222222-2222-2222-2222-222222222222")
+    raw = good_raw()
+    raw["TC_AUTH_JWKS_JSON"] = json.dumps({"keys": [JWK_ES256, second]})
+    cfg = validate_auth_settings(raw)
+    assert cfg.status == "OK"
+    assert len(cfg.jwks_keys) == 2
