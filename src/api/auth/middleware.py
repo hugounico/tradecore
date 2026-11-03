@@ -5,18 +5,32 @@ ASGI = interfaz asíncrona entre el servidor y la app. Este middleware envuelve 
   cabeceras de seguridad; algunas además `cache-control: no-store`.
 - Rutas protegidas: solo pasan si la config está OK y la cookie de sesión es válida; si no,
   responde 303 a /login (si el cliente acepta HTML) o 401, sin llamar a la app.
-- WebSocket: provisional hasta T5 — cierra toda conexión con el código 4401.
+- WebSocket: handshake con 4401 (sin sesión) o 4403 (Origin no permitido); si pasa, la
+  conexión vive hasta el `exp` de la cookie y el gate la cierra con 4401 real al vencer
+  (opción A' del Design §9.3): un único `send_lock`, sin cancelar el `receive` del endpoint.
 
-No lee cabeceras de reenvío ni la ruta cruda; no registra logs; no captura excepciones
-genéricas; no importa la app concreta. La parte WebSocket definitiva (plazos, broadcast) es T5.
+No lee cabeceras de reenvío ni la ruta cruda; no captura excepciones genéricas; no importa la
+app concreta. Solo registra un `debug` si el cierre 4401 no se pudo transmitir.
 """
 from __future__ import annotations
 
+import asyncio
+import logging
 import time
 from collections.abc import Callable
 
 from src.api.auth.config import AuthConfig, load_auth_config
 from src.api.auth.session import SessionCodec, extract_session_cookie
+
+logger = logging.getLogger(__name__)
+
+
+class ClosedByGate(Exception):
+    """Se lanza dentro del `send`/`receive` envueltos cuando el gate ya cerró el WebSocket.
+
+    Hereda de `Exception` a propósito: el endpoint real (y el pusher) capturan `Exception`
+    en su envío, así que esta señal se integra con su manejo de errores y termina el bucle.
+    """
 
 # Rutas públicas: coincidencia EXACTA de (método, ruta). Sin normalizar ni cambiar mayúsculas.
 PUBLIC_ROUTES: frozenset[tuple[str, str]] = frozenset({
@@ -39,7 +53,11 @@ SECURITY_HEADERS: tuple[tuple[bytes, bytes], ...] = (
 _NO_STORE = (b"cache-control", b"no-store")
 _COOKIE = b"cookie"
 _ACCEPT = b"accept"
-_WS_CLOSE_CODE = 4401
+_ORIGIN = b"origin"
+
+# Códigos de cierre WebSocket (rango privado 4000-4999 de la especificación WS).
+WS_CLOSE_UNAUTHORIZED = 4401      # sin sesión válida (o config INVALID, o cookie vencida)
+WS_CLOSE_FORBIDDEN_ORIGIN = 4403  # Origin ausente o no permitido
 
 
 def _merge_headers(app_headers: list[tuple[bytes, bytes]],
@@ -145,11 +163,80 @@ class AuthGate:
                 await send(message)
         return wrapped
 
-    # --- WebSocket (provisional T4: deny total con 4401) ------------------------
+    # --- WebSocket (T5, opción A') ----------------------------------------------
     async def _handle_websocket(self, scope, receive, send) -> None:
+        # Orden del Design: config INVALID (4401) → Origin ausente/ajeno (4403) → cookie (4401).
+        if self._config.status != "OK":
+            await self._ws_reject(WS_CLOSE_UNAUTHORIZED, receive, send)
+            return
+        origins = [v for (name, v) in scope["headers"] if name.lower() == _ORIGIN]
+        allowed = self._config.allowed_origins or frozenset()
+        if len(origins) != 1 or origins[0].decode("latin-1") not in allowed:
+            await self._ws_reject(WS_CLOSE_FORBIDDEN_ORIGIN, receive, send)
+            return
+        # Una sola verificación: decide el rechazo y, si pasa, fija el plazo (exp de la cookie).
+        result = self._codec.verify(self._collect_cookie(scope), int(self._clock()))
+        if not result.ok:
+            await self._ws_reject(WS_CLOSE_UNAUTHORIZED, receive, send)
+            return
+        await self._app(scope, *self._ws_wrap(send, receive, result.exp))
+
+    async def _ws_reject(self, code: int, receive, send) -> None:
+        """Rechazo de handshake: una lectura; si es connect → accept + close con `code`."""
         message = await receive()
         if message["type"] == "websocket.connect":
             await send({"type": "websocket.accept"})
-            await send({"type": "websocket.close", "code": _WS_CLOSE_CODE})
-        # Cualquier otro primer mensaje: no se envía nada.
-        return
+            await send({"type": "websocket.close", "code": code})
+        # Cualquier otro primer mensaje: no se envía nada y no se llama al app.
+
+    def _ws_wrap(self, send, receive, deadline):
+        """Crea los `wreceive`/`wsend` envueltos con estado local a esta conexión."""
+        state = {"close_sent": False, "recv_task": None}
+        send_lock = asyncio.Lock()
+
+        async def _close_locked() -> None:
+            # Debe llamarse con send_lock tomado.
+            if not state["close_sent"]:
+                try:
+                    await send({"type": "websocket.close", "code": WS_CLOSE_UNAUTHORIZED})
+                except (OSError, RuntimeError):
+                    # El socket ya está muerto: no se pudo transmitir el cierre. Sin datos.
+                    logger.debug("WS: cierre 4401 no transmitido")
+                state["close_sent"] = True
+
+        async def wsend(message) -> None:
+            async with send_lock:
+                if state["close_sent"]:
+                    raise ClosedByGate()
+                # `websocket.accept` no es dato: pasa aunque se haya alcanzado el plazo, para
+                # que el cliente reciba el accept del endpoint (fuera de su try) y luego un
+                # 4401 real.
+                if message["type"] != "websocket.accept" and self._clock() >= deadline:
+                    await _close_locked()
+                    raise ClosedByGate()
+                await send(message)
+                if message["type"] == "websocket.close":
+                    state["close_sent"] = True
+
+        async def wreceive():
+            if state["recv_task"] is None:
+                state["recv_task"] = asyncio.create_task(receive())
+            try:
+                if not state["close_sent"]:
+                    remaining = deadline - self._clock()
+                    if remaining > 0:
+                        # `wait` (no `wait_for`): al expirar NO cancela la tarea de recepción.
+                        done, _ = await asyncio.wait({state["recv_task"]}, timeout=remaining)
+                        if state["recv_task"] in done:
+                            t, state["recv_task"] = state["recv_task"], None
+                            return t.result()
+                    async with send_lock:
+                        await _close_locked()
+                t, state["recv_task"] = state["recv_task"], None
+                return await t
+            except asyncio.CancelledError:
+                if state["recv_task"] is not None:
+                    state["recv_task"].cancel()
+                raise
+
+        return wreceive, wsend

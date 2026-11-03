@@ -531,47 +531,6 @@ def test_lifespan_passthrough(tmp_path):
 
 
 # ================================================================================
-# 14. WebSocket provisional (deny 4401)
-# ================================================================================
-def test_ws_connect_accept_then_close_4401(tmp_path):
-    spy = _Spy()
-    gate = mw.AuthGate(_build_app(tmp_path, spy), config=_cfg(), clock=lambda: NOW)
-    sent = []
-    recv_count = {"n": 0}
-
-    async def receive():
-        recv_count["n"] += 1
-        return {"type": "websocket.connect"}
-
-    async def send(m):
-        sent.append(m)
-
-    import anyio
-    anyio.run(gate.__call__, {"type": "websocket", "path": "/x"}, receive, send)
-    assert [m["type"] for m in sent] == ["websocket.accept", "websocket.close"]
-    assert sent[1]["code"] == 4401
-    assert spy.called == set()
-    assert recv_count["n"] == 1
-
-
-def test_ws_disconnect_sends_nothing(tmp_path):
-    spy = _Spy()
-    gate = mw.AuthGate(_build_app(tmp_path, spy), config=_cfg(), clock=lambda: NOW)
-    sent = []
-
-    async def receive():
-        return {"type": "websocket.disconnect"}
-
-    async def send(m):
-        sent.append(m)
-
-    import anyio
-    anyio.run(gate.__call__, {"type": "websocket", "path": "/x"}, receive, send)
-    assert sent == []
-    assert spy.called == set()
-
-
-# ================================================================================
 # 15. load_auth_config: solo si config is None
 # ================================================================================
 def test_load_auth_config_not_called_with_config(tmp_path, monkeypatch):
