@@ -165,11 +165,11 @@ def test_valid_token_ok(verifier, k1):
 # ================================================================================
 # 2. Firma alterada / firmada con otra clave -> bad_sig
 # ================================================================================
-def test_signature_last_char_changed_bad_sig(verifier, k1):
+def test_signature_char_changed_bad_sig(verifier, k1):
     priv, _ = k1
     tok = _encode(_good_payload(), priv, "k1")
-    last = "A" if tok[-1] != "A" else "B"  # cambia el último carácter (firma)
-    tampered = tok[:-1] + last
+    h, p, s = tok.split(".")
+    tampered = f"{h}.{p}.{'B' if s[0] != 'B' else 'C'}{s[1:]}"  # 1.er carácter de la firma: 6 bits útiles
     assert verifier.verify(tampered, NOW).reason == "bad_sig"
 
 
@@ -184,7 +184,7 @@ def test_signed_with_other_key_same_kid_bad_sig(verifier):
 # ================================================================================
 def test_hs256_bad_format(verifier):
     # Token HS256 con kid k1: el alg distinto de ES256 se rechaza en la cabecera.
-    tok = jwt.encode(_good_payload(), "secret", algorithm="HS256", headers={"kid": "k1"})
+    tok = jwt.encode(_good_payload(), "s" * 32, algorithm="HS256", headers={"kid": "k1"})
     assert verifier.verify(tok, NOW).reason == "bad_format"
 
 
@@ -488,7 +488,8 @@ def test_header_tampered_after_sign_bad_sig(verifier, k1):
 def test_order_badsig_beats_expired(verifier, k1):
     priv, _ = k1
     tok = _encode(_good_payload(exp=NOW - 10, iat=NOW - 20), priv, "k1")
-    tampered = tok[:-1] + ("A" if tok[-1] != "A" else "B")  # firma rota + exp vencido
+    h, p, s = tok.split(".")
+    tampered = f"{h}.{p}.{'B' if s[0] != 'B' else 'C'}{s[1:]}"  # 1.er carácter de la firma: 6 bits útiles
     assert verifier.verify(tampered, NOW).reason == "bad_sig"
 
 
