@@ -425,10 +425,10 @@ async def test_external_cancellation(caplog):
 # 12. accept en el plazo: el cliente recibe [accept, close 4401]
 # ================================================================================
 async def test_accept_at_deadline():
-    # Handshake y la recepción del `connect` (dentro de ws.accept) leen EXP-1 (antes del
-    # plazo, así el connect se entrega y el accept se envía). El primer `send` de datos lee
-    # EXP (plazo alcanzado) y dispara el cierre: el cliente recibe [accept, close 4401].
-    seq = [EXP - 1, EXP - 1]
+    # Solo el handshake lee EXP-1. La recepción del `connect` (dentro de ws.accept) ya ve EXP,
+    # pero el gate no aplica el plazo antes del accept: el connect se entrega y el accept se
+    # envía. El primer `send` de datos lee EXP y dispara el cierre: [accept, close 4401].
+    seq = [EXP - 1]
     after = [EXP]
 
     def clock():

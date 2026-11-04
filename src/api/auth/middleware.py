@@ -191,7 +191,7 @@ class AuthGate:
 
     def _ws_wrap(self, send, receive, deadline):
         """Crea los `wreceive`/`wsend` envueltos con estado local a esta conexión."""
-        state = {"close_sent": False, "recv_task": None}
+        state = {"close_sent": False, "recv_task": None, "accepted": False}
         send_lock = asyncio.Lock()
 
         async def _close_locked() -> None:
@@ -215,6 +215,8 @@ class AuthGate:
                     await _close_locked()
                     raise ClosedByGate()
                 await send(message)
+                if message["type"] == "websocket.accept":
+                    state["accepted"] = True
                 if message["type"] == "websocket.close":
                     state["close_sent"] = True
 
@@ -222,7 +224,7 @@ class AuthGate:
             if state["recv_task"] is None:
                 state["recv_task"] = asyncio.create_task(receive())
             try:
-                if not state["close_sent"]:
+                if state["accepted"] and not state["close_sent"]:
                     remaining = deadline - self._clock()
                     if remaining > 0:
                         # `wait` (no `wait_for`): al expirar NO cancela la tarea de recepción.
