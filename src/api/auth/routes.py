@@ -1,4 +1,5 @@
-"""Rutas de autenticación (T6a): `GET /`, `POST /auth/enter` y `POST /auth/logout`.
+"""Rutas de autenticación: `GET /`, `POST /auth/enter`, `POST /auth/logout` (T6a) y
+`GET /login`, `GET /auth/login.js` (T6b).
 
 `build_auth_router` devuelve un `APIRouter` (agrupador de rutas de FastAPI) oculto del esquema
 OpenAPI. Todas las respuestas tienen cuerpo vacío; las redirecciones son 303 con destino fijo
@@ -9,9 +10,11 @@ Este módulo no se conecta a la app real: el cableado es la tarea T7.
 """
 from __future__ import annotations
 
+import html
 import logging
 import time
 from collections.abc import Callable
+from pathlib import Path
 from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, Request
@@ -30,6 +33,13 @@ MAX_BODY_BYTES = 8192
 LOGIN_LOCATION = "/login"
 LOGIN_FAILED_LOCATION = "/login?e=1"
 DASHBOARD_LOCATION = "/static/index.html"
+
+# Página de login (T6b): archivos en src/api/auth/static/, leídos una vez al crear el router.
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+# CSP estricta (Design §11, REQ-049), solo en /login y /auth/login.js. connect-src = URL de
+# Supabase validada en T1; con config INVALID, 'none' (la página muestra "no disponible").
+CSP_TEMPLATE = ("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                "connect-src {connect}; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
 
 _FORM_TYPE = "application/x-www-form-urlencoded"
 _FIELD_NAME = "access_token"
@@ -60,6 +70,20 @@ def build_auth_router(
     verifier = TokenVerifier(config)
     router = APIRouter(include_in_schema=False)
 
+    # --- Página de login: se arma una vez (sin plantillas ni datos de la petición) ---
+    ok = config.status == "OK"
+    supabase_url = config.supabase_url if ok else ""
+    publishable_key = config.publishable_key if ok else ""
+    csp = CSP_TEMPLATE.format(connect=supabase_url or "'none'")
+    template = (STATIC_DIR / "login.html").read_text(encoding="utf-8")
+    login_js = (STATIC_DIR / "login.js").read_bytes()
+    filled = (template
+              .replace("__TC_SUPABASE_URL__", html.escape(supabase_url, quote=True))
+              .replace("__TC_PUBLISHABLE_KEY__", html.escape(publishable_key, quote=True)))
+    page_login = filled.replace("__TC_VIEW__", "login").encode("utf-8")
+    page_session = filled.replace("__TC_VIEW__", "session").encode("utf-8")
+    page_headers = {"content-security-policy": csp, "cache-control": "no-store"}
+
     # --- Utilidades locales (cierran sobre config/codec) --------------------------
     def origin_is_valid(request: Request) -> bool:
         """Origin válido = config OK y exactamente una cabecera Origin permitida."""
@@ -88,6 +112,18 @@ def build_auth_router(
         # La redirección depende de la sesión, por eso nunca se cachea.
         target = DASHBOARD_LOCATION if session_is_valid(request) else LOGIN_LOCATION
         return _redirect(target, no_store=True)
+
+    # --- GET /login y GET /auth/login.js -------------------------------------
+    @router.get("/login")
+    async def login_page(request: Request) -> Response:
+        body = page_session if session_is_valid(request) else page_login
+        # Sin sesión: formulario; con sesión válida: "Sesión activa" (Ir al dashboard / Cerrar sesión).
+        return Response(content=body, media_type="text/html; charset=utf-8", headers=page_headers)
+
+    @router.get("/auth/login.js")
+    async def login_script() -> Response:
+        return Response(content=login_js, media_type="text/javascript; charset=utf-8",
+                        headers=page_headers)
 
     # --- POST /auth/enter -------------------------------------------------------
     @router.post("/auth/enter")
