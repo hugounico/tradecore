@@ -15,6 +15,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from tests.auth_testkit import session_headers
 from src.api.app import app, _build_initial_load_message
 from src.api.throttled_pusher import ThrottledPusher
 from src.connectors.databento_connector import DabentoConnector
@@ -220,7 +221,7 @@ class TestWebSocketReceivesValidJson:
                 from starlette.testclient import TestClient
 
                 with TestClient(app) as tc:
-                    with tc.websocket_connect("/ws/chart") as ws:
+                    with tc.websocket_connect("/ws/chart", headers=session_headers()) as ws:
                         # Receive the initial_load message
                         data = ws.receive_text()
                         msg = json.loads(data)
@@ -263,7 +264,7 @@ class TestWebSocketReceivesValidJson:
             from starlette.testclient import TestClient
 
             with TestClient(app) as tc:
-                with tc.websocket_connect("/ws/chart") as ws:
+                with tc.websocket_connect("/ws/chart", headers=session_headers()) as ws:
                     data = ws.receive_text()
                     msg = json.loads(data)
 

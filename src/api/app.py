@@ -22,6 +22,9 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from src.api.auth.config import load_auth_config
+from src.api.auth.middleware import AuthGate
+from src.api.auth.routes import build_auth_router
 from src.api.market_hours import is_regular_market_open
 from src.api.throttled_pusher import ThrottledPusher, signal_payload
 from src.config import Settings
@@ -515,6 +518,11 @@ def _on_pipeline_task_done(task) -> None:
 
 # Create FastAPI app
 app = FastAPI(title="TradeCore MVP", lifespan=lifespan)
+
+# Paso 2 (login): la config de acceso se lee una sola vez y la comparten la puerta y las rutas.
+_auth_config = load_auth_config()
+app.add_middleware(AuthGate, config=_auth_config)
+app.include_router(build_auth_router(_auth_config))
 
 
 @app.get("/health")

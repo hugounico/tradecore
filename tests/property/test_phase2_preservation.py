@@ -46,6 +46,8 @@ from fastapi.testclient import TestClient
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from tests.auth_testkit import session_headers
+
 # Importamos la app FastAPI real para probar sus rutas en memoria (via ASGITransport).
 from src.api.app import app
 
@@ -87,7 +89,7 @@ async def test_nonexistent_route_returns_404():
     """GET /nonexistent devuelve 404 — ruta inexistente, comportamiento a preservar."""
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/nonexistent")
+        response = await client.get("/nonexistent", headers=session_headers())
 
     assert response.status_code == 404, (
         f"/nonexistent devolvio HTTP {response.status_code} (se esperaba 404)."
@@ -127,7 +129,7 @@ def test_ws_chart_accepts_connections(monkeypatch):
         return_value=[],
     ):
         with TestClient(app) as client:
-            with client.websocket_connect("/ws/chart") as websocket:
+            with client.websocket_connect("/ws/chart", headers=session_headers()) as websocket:
                 # Llegar aca sin excepcion confirma que el servidor ACEPTO la conexion.
                 assert websocket is not None
 
@@ -146,7 +148,7 @@ def test_ws_chart_accepts_connections(monkeypatch):
 #   "/ws/chart"    -> WebSocket (no es GET normal)
 #   cualquier "/static/..." -> archivos estaticos
 _RESERVED_PREFIXES = ("/static", "/ws")
-_RESERVED_EXACT = {"", "/", "/health", "/debug/network", "/ws/chart"}
+_RESERVED_EXACT = {"", "/", "/health", "/login", "/debug/network", "/ws/chart"}
 
 
 def _is_reserved_path(path: str) -> bool:
@@ -195,7 +197,7 @@ def test_random_non_debug_paths_return_404(segment):
     # TestClient sin context manager NO dispara el ciclo de vida (lifespan) de la
     # app: para peticiones HTTP simples basta con enrutar la request a la app ASGI.
     client = TestClient(app)
-    response = client.get(path)
+    response = client.get(path, headers=session_headers())
 
     assert response.status_code == 404, (
         f"Ruta aleatoria {path!r} devolvio HTTP {response.status_code} "
