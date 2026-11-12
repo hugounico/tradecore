@@ -16,6 +16,7 @@ from unittest.mock import patch
 import pandas as pd
 from starlette.testclient import TestClient
 
+from tests.auth_testkit import session_headers
 from src.api.app import app
 from src.engine.signal_engine import SignalEngine
 
@@ -72,7 +73,7 @@ def test_replay_mode_end_to_end_without_databento(monkeypatch, tmp_path):
                 time.sleep(0.02)
             assert app_module._replay.phase == "finished"
             health = tc.get("/health")
-            with tc.websocket_connect("/ws/chart") as ws:
+            with tc.websocket_connect("/ws/chart", headers=session_headers()) as ws:
                 msg = json.loads(ws.receive_text())
 
     assert health.status_code == 200

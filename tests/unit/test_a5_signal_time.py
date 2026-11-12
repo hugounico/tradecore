@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, patch
 
 from starlette.testclient import TestClient
 
+from tests.auth_testkit import session_headers
 from src.api.app import app
 from src.schemas.candle import Candle
 from src.schemas.signal import SignalType
@@ -87,7 +88,7 @@ def test_t2_reconnecting_client_receives_latest_signal(monkeypatch):
                 time.sleep(0.02)
             assert len(app_module._signal_history) == 1, "el pipeline no emitió la señal esperada"
             emitted = app_module._signal_history[0]
-            with tc.websocket_connect("/ws/chart") as ws:
+            with tc.websocket_connect("/ws/chart", headers=session_headers()) as ws:
                 msg = json.loads(ws.receive_text())
 
     assert msg["type"] == "initial_load"

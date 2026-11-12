@@ -295,10 +295,16 @@
                 }
             };
 
-            ws.onclose = function () {
+            ws.onclose = function (ev) {
                 if (thisWs !== ws) { return; }  // cierre de un socket viejo: ignorar
                 clearWatchdog();
                 refreshStatus();
+                if (ev && ev.code === 4401) { window.location.href = '/login'; return; }
+                if (ev && ev.code === 4403) {
+                    connectionDot.className = '';
+                    connectionText.textContent = 'Acceso denegado';
+                    return;
+                }
                 scheduleReconnect();
             };
 

@@ -14,6 +14,7 @@ import pandas as pd
 import pytest
 from starlette.testclient import TestClient
 
+from tests.auth_testkit import session_headers
 from src.api.app import app
 
 T0 = datetime(2024, 6, 3, 14, 0, tzinfo=timezone.utc)
@@ -112,7 +113,7 @@ def test_f5_replay_mode_from_url_runs_and_never_logs_the_signature(served, monke
         while app_module._replay.phase != "finished" and time.monotonic() < deadline:
             time.sleep(0.02)
         health = tc.get("/health")
-        with tc.websocket_connect("/ws/chart") as ws:
+        with tc.websocket_connect("/ws/chart", headers=session_headers()) as ws:
             msg = json.loads(ws.receive_text())
     assert health.json() == {"status": "ok", "phase": "finished", "mode": "replay"}
     assert len(msg["data"]["candles"]) > 0

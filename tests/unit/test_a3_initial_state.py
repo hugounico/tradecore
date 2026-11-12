@@ -28,6 +28,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from starlette.testclient import TestClient
 
+from tests.auth_testkit import session_headers
 from src.api.app import app, _build_initial_load_message
 from src.schemas.candle import Candle
 from src.schemas.signal import Signal, SignalType
@@ -62,7 +63,7 @@ class TestInitialLoadAlwaysSent:
             return_value=[],
         ):
             with TestClient(app) as tc:
-                with tc.websocket_connect("/ws/chart") as ws:
+                with tc.websocket_connect("/ws/chart", headers=session_headers()) as ws:
                     msg = json.loads(ws.receive_text())
 
         assert msg["type"] == "initial_load"
@@ -185,7 +186,7 @@ class TestInitialLoadSessionHistoryFiltering:
                 app_module._signal_history.append(dentro)
                 app_module._signal_history.append(despues)
 
-                with tc.websocket_connect("/ws/chart") as ws:
+                with tc.websocket_connect("/ws/chart", headers=session_headers()) as ws:
                     msg = json.loads(ws.receive_text())
 
         assert msg["type"] == "initial_load"
