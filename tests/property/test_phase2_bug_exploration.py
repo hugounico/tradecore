@@ -43,6 +43,8 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from tests.auth_testkit import session_headers
+
 # Importamos la app FastAPI real para probar sus rutas en memoria (via ASGITransport).
 from src.api.app import app
 
@@ -67,7 +69,7 @@ async def test_debug_network_get_returns_404():
     # ASGITransport enruta las peticiones directo a la app en memoria (sin red real).
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/debug/network")
+        response = await client.get("/debug/network", headers=session_headers())
 
     # Comportamiento esperado tras el arreglo: 404 (ruta inexistente).
     assert response.status_code == 404, (
@@ -87,7 +89,7 @@ async def test_debug_network_post_blocked():
     """
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.post("/debug/network")
+        response = await client.post("/debug/network", headers=session_headers())
 
     assert response.status_code in (404, 405), (
         f"CONTRAEJEMPLO Issue 1 (POST): /debug/network respondio "
